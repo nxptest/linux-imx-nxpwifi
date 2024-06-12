@@ -272,6 +272,13 @@ enum rdwr_status {
 	RDWR_STATUS_DONE = 2
 };
 
+enum nxpwifi_chan_band {
+	BAND_2GHZ = 0,
+	BAND_5GHZ,
+	BAND_6GHZ,
+	BAND_4GHZ,
+};
+
 enum nxpwifi_chan_width {
 	CHAN_BW_20MHZ = 0,
 	CHAN_BW_10MHZ,

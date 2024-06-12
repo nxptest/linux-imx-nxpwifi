@@ -17,7 +17,7 @@ enum vht_cfg_misc_config {
 	VHT_CAP_UAP_ONLY
 };
 
-#define DEFAULT_VHT_MCS_SET 0xfffa
+#define DEFAULT_VHT_MCS_SET 0xfffe
 #define DISABLE_VHT_MCS_SET 0xffff
 
 #define VHT_BW_80_160_80P80 BIT(2)

@@ -274,6 +274,8 @@ nxpwifi_uap_bss_param_prepare(u8 *tlv, void *cmd_buf, u16 *param_size)
 			cpu_to_le16(sizeof(struct host_cmd_tlv_auth_type) -
 			sizeof(struct nxpwifi_ie_types_header));
 		auth_type->auth_type = (u8)bss_cfg->auth_mode;
+		auth_type->pwe_derivation = 0;
+		auth_type->transition_disable;
 		cmd_size += sizeof(struct host_cmd_tlv_auth_type);
 		tlv += sizeof(struct host_cmd_tlv_auth_type);
 	}
@@ -892,6 +894,9 @@ nxpwifi_set_ht_params(struct nxpwifi_private *priv,
 	if (ht_ie) {
 		memcpy(&bss_cfg->ht_cap, ht_ie + 2,
 		       sizeof(struct ieee80211_ht_cap));
+		if (ISSUPP_BEAMFORMING(priv->adapter->hw_dot_11n_dev_cap))
+			bss_cfg->ht_cap.tx_BF_cap_info =
+				cpu_to_le32(NXPWIFI_DEF_11N_TX_BF_CAP);
 		priv->ap_11n_enabled = 1;
 	} else {
 		memset(&bss_cfg->ht_cap, 0, sizeof(struct ieee80211_ht_cap));

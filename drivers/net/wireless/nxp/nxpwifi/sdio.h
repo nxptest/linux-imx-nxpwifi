@@ -10,12 +10,12 @@
 
 #include "main.h"
 
-#define IW416_SDIOUART_FW_NAME "nxp/sdiouartiw416_combo_v0.bin"
+#define IW61X_SDIO_FW_NAME     "nxp/sd_w61x_v1.bin.se"
 
 #define BLOCK_MODE	1
 #define BYTE_MODE	0
 
-#define NXPWIFI_SDIO_IO_PORT_MASK		0xfffff
+#define NXPWIFI_SDIO_IO_PORT_MASK	0xfffff
 
 #define NXPWIFI_SDIO_BYTE_MODE_MASK	0x80000000
 
@@ -37,13 +37,12 @@
 #define UP_LD_CMD_PORT_HOST_INT_STATUS	(0x40U)
 #define DN_LD_CMD_PORT_HOST_INT_STATUS	(0x80U)
 
-#define NXPWIFI_MP_AGGR_BUF_SIZE_16K	(16384)
-#define NXPWIFI_MP_AGGR_BUF_SIZE_32K	(32768)
+#define NXPWIFI_MP_AGGR_BSIZE_32K	(32768)
 /* we leave one block of 256 bytes for DMA alignment*/
-#define NXPWIFI_MP_AGGR_BUF_SIZE_MAX    (65280)
+#define NXPWIFI_MP_AGGR_BSIZE_MAX	(65280)
 
 /* Misc. Config Register : Auto Re-enable interrupts */
-#define AUTO_RE_ENABLE_INT              BIT(4)
+#define AUTO_RE_ENABLE_INT		BIT(4)
 
 /* Host Control Registers : Configuration */
 #define CONFIGURATION_REG		0x00

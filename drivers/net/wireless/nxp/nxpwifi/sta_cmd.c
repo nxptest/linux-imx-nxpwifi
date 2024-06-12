@@ -66,7 +66,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 	adapter->fw_release_number = le32_to_cpu(hw_spec->fw_release_number);
 	adapter->fw_api_ver = (adapter->fw_release_number >> 16) & 0xff;
 	adapter->number_of_antenna =
-			le16_to_cpu(hw_spec->number_of_antenna) & 0xf;
+		le16_to_cpu(hw_spec->number_of_antenna) & 0xf;
 
 	if (le32_to_cpu(hw_spec->dot_11ac_dev_cap)) {
 		adapter->is_hw_11ac_capable = true;
@@ -194,9 +194,12 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 	adapter->hw_dev_mcs_support = hw_spec->dev_mcs_support;
 	adapter->user_dev_mcs_support = adapter->hw_dev_mcs_support;
 
-	if (adapter->if_ops.update_mp_end_port)
-		adapter->if_ops.update_mp_end_port(adapter,
-					le16_to_cpu(hw_spec->mp_end_port));
+	if (adapter->if_ops.update_mp_end_port) {
+		u16 mp_end_port;
+
+		mp_end_port = le16_to_cpu(hw_spec->mp_end_port);
+		adapter->if_ops.update_mp_end_port(adapter, mp_end_port);
+	}
 
 	if (adapter->fw_api_ver == NXPWIFI_FW_V15)
 		adapter->scan_chan_gap_enabled = true;
@@ -334,7 +337,7 @@ nxpwifi_cmd_sta_802_11_snmp_mib(struct nxpwifi_private *priv,
 		    "cmd: SNMP_CMD: cmd_oid = 0x%x\n", cmd_type);
 	cmd->command = cpu_to_le16(HOST_CMD_802_11_SNMP_MIB);
 	cmd->size = cpu_to_le16(sizeof(struct host_cmd_ds_802_11_snmp_mib)
-				- 1 + S_DS_GEN);
+				+ S_DS_GEN);
 
 	snmp_mib->oid = cpu_to_le16((u16)cmd_type);
 	if (cmd_action == HOST_ACT_GEN_GET) {
@@ -2000,16 +2003,21 @@ nxpwifi_ret_sta_reconfigure_rx_buff(struct nxpwifi_private *priv,
 	if (0xffff != (u16)le16_to_cpu(resp->params.tx_buf.buff_size)) {
 		adapter->tx_buf_size =
 			(u16)le16_to_cpu(resp->params.tx_buf.buff_size);
-		adapter->tx_buf_size = (adapter->tx_buf_size
-					/ NXPWIFI_SDIO_BLOCK_SIZE)
-				       * NXPWIFI_SDIO_BLOCK_SIZE;
+		adapter->tx_buf_size =
+			(adapter->tx_buf_size / NXPWIFI_SDIO_BLOCK_SIZE) *
+			NXPWIFI_SDIO_BLOCK_SIZE;
 		adapter->curr_tx_buf_size = adapter->tx_buf_size;
 		nxpwifi_dbg(adapter, CMD, "cmd: curr_tx_buf_size=%d\n",
 			    adapter->curr_tx_buf_size);
 
-		if (adapter->if_ops.update_mp_end_port)
+		if (adapter->if_ops.update_mp_end_port) {
+			u16 mp_end_port;
+
+			mp_end_port =
+				le16_to_cpu(resp->params.tx_buf.mp_end_port);
 			adapter->if_ops.update_mp_end_port(adapter,
-				le16_to_cpu(resp->params.tx_buf.mp_end_port));
+							   mp_end_port);
+		}
 	}
 
 	return 0;

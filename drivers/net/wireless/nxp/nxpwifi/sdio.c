@@ -28,14 +28,14 @@ static void nxpwifi_sdio_work(struct work_struct *work);
 
 static struct nxpwifi_if_ops sdio_ops;
 
-static const struct nxpwifi_sdio_card_reg nxpwifi_reg_iw416 = {
+static const struct nxpwifi_sdio_card_reg nxpwifi_reg_iw61x = {
 	.start_rd_port = 0,
 	.start_wr_port = 0,
 	.base_0_reg = 0xF8,
 	.base_1_reg = 0xF9,
 	.poll_reg = 0x5C,
 	.host_int_enable = UP_LD_HOST_INT_MASK | DN_LD_HOST_INT_MASK |
-			CMD_PORT_UPLD_INT_MASK | CMD_PORT_DNLD_INT_MASK,
+			   CMD_PORT_UPLD_INT_MASK | CMD_PORT_DNLD_INT_MASK,
 	.host_int_rsr_reg = 0x4,
 	.host_int_status_reg = 0x0C,
 	.host_int_mask_reg = 0x08,
@@ -83,14 +83,14 @@ static const struct nxpwifi_sdio_card_reg nxpwifi_reg_iw416 = {
 				 0x68, 0x69, 0x6a},
 };
 
-static const struct nxpwifi_sdio_device nxpwifi_sdio_iw416 = {
-	.firmware_sdiouart = IW416_SDIOUART_FW_NAME,
-	.reg = &nxpwifi_reg_iw416,
+static const struct nxpwifi_sdio_device nxpwifi_sdio_iw61x = {
+	.firmware = IW61X_SDIO_FW_NAME,
+	.reg = &nxpwifi_reg_iw61x,
 	.max_ports = 32,
 	.mp_agg_pkt_limit = 16,
 	.tx_buf_size = NXPWIFI_TX_DATA_BUF_SIZE_4K,
-	.mp_tx_agg_buf_size = NXPWIFI_MP_AGGR_BUF_SIZE_MAX,
-	.mp_rx_agg_buf_size = NXPWIFI_MP_AGGR_BUF_SIZE_MAX,
+	.mp_tx_agg_buf_size = NXPWIFI_MP_AGGR_BSIZE_MAX,
+	.mp_rx_agg_buf_size = NXPWIFI_MP_AGGR_BSIZE_MAX,
 	.can_dump_fw = true,
 	.fw_dump_enh = true,
 	.can_ext_scan = true,
@@ -119,7 +119,7 @@ static struct memory_type_mapping mem_type_mapping_tbl[] = {
 };
 
 static const struct of_device_id nxpwifi_sdio_of_match_table[] __maybe_unused = {
-	{ .compatible = "nxp,iw416" },
+	{ .compatible = "nxp,iw61x" },
 	{ }
 };
 
@@ -542,8 +542,8 @@ static void nxpwifi_sdio_coredump(struct device *dev)
 
 /* WLAN IDs */
 static const struct sdio_device_id nxpwifi_ids[] = {
-	{SDIO_DEVICE(SDIO_VENDOR_ID_MARVELL, SDIO_DEVICE_ID_MARVELL_8978_WLAN),
-		.driver_data = (unsigned long)&nxpwifi_sdio_iw416},
+	{SDIO_DEVICE(SDIO_VENDOR_ID_NXP, SDIO_DEVICE_ID_NXP_IW61X),
+		.driver_data = (unsigned long)&nxpwifi_sdio_iw61x},
 	{},
 };
 
@@ -1814,7 +1814,7 @@ static int nxpwifi_sdio_host_to_card(struct nxpwifi_adapter *adapter,
 	blk_size = NXPWIFI_SDIO_BLOCK_SIZE;
 	buf_block_len = (pkt_len + blk_size - 1) / blk_size;
 	put_unaligned_le16((u16)pkt_len, payload + 0);
-	put_unaligned_le16((u32)type, payload + 2);
+	put_unaligned_le16((u16)type, payload + 2);
 
 	/* This is SDIO specific header
 	 *  u16 length,
@@ -2052,14 +2052,14 @@ static int nxpwifi_init_sdio(struct nxpwifi_adapter *adapter)
 					     card->mp_rx_agg_buf_size);
 
 	/* Allocate 32k MPA Tx/Rx buffers if 64k memory allocation fails */
-	if (ret && (card->mp_tx_agg_buf_size == NXPWIFI_MP_AGGR_BUF_SIZE_MAX ||
-		    card->mp_rx_agg_buf_size == NXPWIFI_MP_AGGR_BUF_SIZE_MAX)) {
+	if (ret && (card->mp_tx_agg_buf_size == NXPWIFI_MP_AGGR_BSIZE_MAX ||
+		    card->mp_rx_agg_buf_size == NXPWIFI_MP_AGGR_BSIZE_MAX)) {
 		/* Disable rx single port aggregation */
 		adapter->host_disable_sdio_rx_aggr = true;
 
-		ret = nxpwifi_alloc_sdio_mpa_buffers
-			(adapter, NXPWIFI_MP_AGGR_BUF_SIZE_32K,
-			 NXPWIFI_MP_AGGR_BUF_SIZE_32K);
+		ret = nxpwifi_alloc_sdio_mpa_buffers(adapter,
+						     NXPWIFI_MP_AGGR_BSIZE_32K,
+						     NXPWIFI_MP_AGGR_BSIZE_32K);
 		if (ret) {
 			/* Disable multi port aggregation */
 			card->mpa_tx.enabled = 0;
@@ -2644,4 +2644,4 @@ MODULE_AUTHOR("NXP International Ltd.");
 MODULE_DESCRIPTION("NXP WiFi SDIO Driver version " SDIO_VERSION);
 MODULE_VERSION(SDIO_VERSION);
 MODULE_LICENSE("GPL");
-MODULE_FIRMWARE(IW416_SDIOUART_FW_NAME);
+MODULE_FIRMWARE(IW61X_SDIO_FW_NAME);

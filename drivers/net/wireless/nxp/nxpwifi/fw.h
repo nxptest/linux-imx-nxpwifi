@@ -108,14 +108,14 @@ enum KEY_TYPE_ID {
 #define KEY_RX_KEY	BIT(5)
 #define KEY_IGTK	BIT(10)
 
-#define MAX_POLL_TRIES			100
-#define MAX_FIRMWARE_POLL_TRIES			150
+#define MAX_POLL_TRIES			10000
+#define MAX_FIRMWARE_POLL_TRIES		300
 
-#define FIRMWARE_READY_SDIO				0xfedc
-#define FIRMWARE_READY_PCIE				0xfedcba00
+#define FIRMWARE_READY_SDIO		0xfedc
+#define FIRMWARE_READY_PCIE		0xfedcba00
 
-#define NXPWIFI_COEX_MODE_TIMESHARE			0x01
-#define NXPWIFI_COEX_MODE_SPATIAL			0x82
+#define NXPWIFI_COEX_MODE_TIMESHARE	0x01
+#define NXPWIFI_COEX_MODE_SPATIAL	0x82
 
 enum nxpwifi_usb_ep {
 	NXPWIFI_USB_EP_CMD_EVENT = 1,
@@ -166,6 +166,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_UAP_BEACON_PERIOD  (PROPRIETARY_TLV_BASE_ID + 44)
 #define TLV_TYPE_UAP_DTIM_PERIOD    (PROPRIETARY_TLV_BASE_ID + 45)
 #define TLV_TYPE_UAP_BCAST_SSID     (PROPRIETARY_TLV_BASE_ID + 48)
+#define TLV_TYPE_UAP_PREAMBLE_CTL   (PROPRIETARY_TLV_BASE_ID + 49)
 #define TLV_TYPE_UAP_RTS_THRESHOLD  (PROPRIETARY_TLV_BASE_ID + 51)
 #define TLV_TYPE_UAP_AO_TIMER       (PROPRIETARY_TLV_BASE_ID + 57)
 #define TLV_TYPE_UAP_WEP_KEY        (PROPRIETARY_TLV_BASE_ID + 59)
@@ -1040,8 +1041,8 @@ struct host_cmd_ds_get_hw_spec {
 	u8 dev_mcs_support;
 	__le16 mp_end_port;	/* SDIO only, reserved for other interfacces */
 	__le16 mgmt_buf_count;	/* mgmt IE buffer count */
+	__le32 reserved_4;
 	__le32 reserved_5;
-	__le32 reserved_6;
 	__le32 dot_11ac_dev_cap;
 	__le32 dot_11ac_mcs_support;
 	u8 tlvs[];
@@ -1175,7 +1176,7 @@ struct host_cmd_ds_802_11_get_log {
 } __packed;
 
 /* Enumeration for rate format */
-enum _nxpwifi_rate_format {
+enum nxpwifi_rate_format {
 	NXPWIFI_RATE_FORMAT_LG = 0,
 	NXPWIFI_RATE_FORMAT_HT,
 	NXPWIFI_RATE_FORMAT_VHT,
@@ -1317,9 +1318,16 @@ struct host_cmd_ds_rf_ant_siso {
 	__le16 ant_mode;
 } __packed;
 
+#define BAND_CFG_CHAN_BAND_MASK		0x03
+#define BAND_CFG_CHAN_BAND_SHIFT_BIT	0
+#define BAND_CFG_CHAN_WIDTH_MASK	0x0C
+#define BAND_CFG_CHAN_WIDTH_SHIFT_BIT	2
+#define BAND_CFG_CHAN2_OFFSET_MASK	0x30
+#define BAND_CFG_CHAN2_SHIFT_BIT	4
+
 struct nxpwifi_chan_desc {
 	__le16 start_freq;
-	u8 chan_width;
+	u8 band_cfg;
 	u8 chan_num;
 } __packed;
 
@@ -1839,6 +1847,8 @@ struct host_cmd_tlv_wep_key {
 struct host_cmd_tlv_auth_type {
 	struct nxpwifi_ie_types_header header;
 	u8 auth_type;
+	u8 pwe_derivation;
+	u8 transition_disable;
 } __packed;
 
 struct host_cmd_tlv_encrypt_protocol {
@@ -2054,18 +2064,12 @@ struct nxpwifi_ie_types_mc_group_info {
 	u8 bss_type_numlist[];
 } __packed;
 
-struct meas_rpt_map {
-	u8 rssi:3;
-	u8 unmeasured:1;
-	u8 radar:1;
-	u8 unidentified_sig:1;
-	u8 ofdm_preamble:1;
-	u8 bss:1;
-} __packed;
+#define MEAS_RPT_MAP_RADAR_MASK		0x08
+#define MEAS_RPT_MAP_RADAR_SHIFT_BIT	3
 
 struct nxpwifi_ie_types_chan_rpt_data {
 	struct nxpwifi_ie_types_header header;
-	struct meas_rpt_map map;
+	u8 meas_rpt_map;
 } __packed;
 
 struct host_cmd_ds_802_11_subsc_evt {
