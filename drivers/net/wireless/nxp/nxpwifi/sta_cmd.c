@@ -797,40 +797,41 @@ nxpwifi_cmd_sta_802_11d_domain_info(struct nxpwifi_private *priv,
 		&cmd->params.domain_info;
 	struct nxpwifi_ietypes_domain_param_set *domain =
 		&domain_info->domain;
+	struct nxpwifi_ietypes_domain_code *domain_code;
 	u8 no_of_triplet = adapter->domain_reg.no_of_triplet;
+	int triplet_size;
 
 	nxpwifi_dbg(adapter, INFO,
 		    "info: 11D: no_of_triplet=0x%x\n", no_of_triplet);
 
 	cmd->command = cpu_to_le16(HOST_CMD_802_11D_DOMAIN_INFO);
+	cmd->size = cpu_to_le16(S_DS_GEN);
 	domain_info->action = cpu_to_le16(cmd_action);
-	if (cmd_action == HOST_ACT_GEN_GET) {
-		cmd->size = cpu_to_le16(sizeof(domain_info->action) + S_DS_GEN);
-		return 0;
-	}
+	le16_unaligned_add_cpu(&cmd->size, sizeof(domain_info->action));
 
-	/* Set domain info fields */
+	if (cmd_action == HOST_ACT_GEN_GET)
+		return 0;
+
+	triplet_size = no_of_triplet *
+		sizeof(struct ieee80211_country_ie_triplet);
+
 	domain->header.type = cpu_to_le16(WLAN_EID_COUNTRY);
+	domain->header.len =
+		cpu_to_le16(sizeof(domain->country_code) + triplet_size);
 	memcpy(domain->country_code, adapter->domain_reg.country_code,
 	       sizeof(domain->country_code));
-
-	domain->header.len =
-		cpu_to_le16((no_of_triplet *
-			     sizeof(struct ieee80211_country_ie_triplet))
-			    + sizeof(domain->country_code));
-
-	if (no_of_triplet) {
+	if (no_of_triplet)
 		memcpy(domain->triplet, adapter->domain_reg.triplet,
-		       no_of_triplet * sizeof(struct
-					      ieee80211_country_ie_triplet));
+		       triplet_size);
+	le16_unaligned_add_cpu(&cmd->size, sizeof(*domain) + triplet_size);
 
-		cmd->size = cpu_to_le16(sizeof(domain_info->action) +
-					le16_to_cpu(domain->header.len) +
-					sizeof(struct nxpwifi_ie_types_header)
-					+ S_DS_GEN);
-	} else {
-		cmd->size = cpu_to_le16(sizeof(domain_info->action) + S_DS_GEN);
-	}
+	domain_code = (struct nxpwifi_ietypes_domain_code *)((u8 *)cmd +
+		le16_to_cpu(cmd->size));
+	domain_code->header.type = cpu_to_le16(TLV_TYPE_REGION_DOMAIN_CODE);
+	domain_code->header.len =
+		cpu_to_le16(sizeof(*domain_code) -
+		sizeof(struct nxpwifi_ie_types_header));
+	le16_unaligned_add_cpu(&cmd->size, sizeof(*domain_code));
 
 	return 0;
 }

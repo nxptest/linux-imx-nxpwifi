@@ -2291,8 +2291,8 @@ int nxpwifi_cmd_802_11_bg_scan_config(struct nxpwifi_private *priv,
 		memcpy(wildcard_ssid_tlv->ssid,
 		       bgscan_cfg_in->ssid_list[i].ssid.ssid, ssid_len);
 
-		tlv_pos += (sizeof(wildcard_ssid_tlv->header)
-				+ le16_to_cpu(wildcard_ssid_tlv->header.len));
+		tlv_pos += (sizeof(wildcard_ssid_tlv->header) +
+			le16_to_cpu(wildcard_ssid_tlv->header.len));
 	}
 
 	tlv_l = (struct nxpwifi_ie_types_chan_list_param_set *)tlv_pos;

@@ -460,6 +460,7 @@ enum state_11d_t {
 #define NXPWIFI_MAX_TRIPLET_802_11D		83
 
 struct nxpwifi_802_11d_domain_reg {
+	u8 dfs_region;
 	u8 country_code[IEEE80211_COUNTRY_STRING_LEN];
 	u8 no_of_triplet;
 	struct ieee80211_country_ie_triplet
@@ -936,6 +937,7 @@ struct nxpwifi_adapter {
 	struct nxpwifi_wait_queue cmd_wait_q;
 	u8 scan_wait_q_woken;
 	spinlock_t queue_lock;		/* lock for tx queues */
+	u8 dfs_region;
 	u8 country_code[IEEE80211_COUNTRY_STRING_LEN];
 	u16 max_mgmt_ie_index;
 	const struct firmware *cal_data;

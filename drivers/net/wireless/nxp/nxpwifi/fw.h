@@ -193,6 +193,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_RXBA_SYNC          (PROPRIETARY_TLV_BASE_ID + 153)
 #define TLV_TYPE_COALESCE_RULE      (PROPRIETARY_TLV_BASE_ID + 154)
 #define TLV_TYPE_KEY_PARAM_V2       (PROPRIETARY_TLV_BASE_ID + 156)
+#define TLV_TYPE_REGION_DOMAIN_CODE (PROPRIETARY_TLV_BASE_ID + 171)
 #define TLV_TYPE_REPEAT_COUNT       (PROPRIETARY_TLV_BASE_ID + 176)
 #define TLV_TYPE_PS_PARAMS_IN_HS    (PROPRIETARY_TLV_BASE_ID + 181)
 #define TLV_TYPE_MULTI_CHAN_INFO    (PROPRIETARY_TLV_BASE_ID + 183)
@@ -1516,6 +1517,12 @@ struct host_cmd_ds_802_11_bg_scan_query {
 struct host_cmd_ds_802_11_bg_scan_query_rsp {
 	__le32 report_condition;
 	struct host_cmd_ds_802_11_scan_rsp scan_resp;
+} __packed;
+
+struct nxpwifi_ietypes_domain_code {
+	struct nxpwifi_ie_types_header header;
+	u8 domain_code;
+	u8 reserved;
 } __packed;
 
 struct nxpwifi_ietypes_domain_param_set {

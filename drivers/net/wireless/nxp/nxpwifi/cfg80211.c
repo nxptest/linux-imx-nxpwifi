@@ -501,6 +501,8 @@ int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
 	struct nxpwifi_private *priv;
 	struct nxpwifi_802_11d_domain_reg *domain_info = &adapter->domain_reg;
 
+	domain_info->dfs_region = adapter->dfs_region;
+
 	/* Set country code */
 	domain_info->country_code[0] = adapter->country_code[0];
 	domain_info->country_code[1] = adapter->country_code[1];
@@ -625,6 +627,7 @@ static void nxpwifi_reg_notifier(struct wiphy *wiphy,
 		    sizeof(request->alpha2))) {
 		memcpy(adapter->country_code, request->alpha2,
 		       sizeof(request->alpha2));
+		adapter->dfs_region = request->dfs_region;
 		nxpwifi_send_domain_info_cmd_fw(wiphy);
 		nxpwifi_dnld_txpwr_table(priv);
 	}
