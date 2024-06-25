@@ -119,10 +119,11 @@ enum {
 	 (_adapter)->data_received); \
 	})
 
-#define NXPWIFI_TYPE_CMD				1
-#define NXPWIFI_TYPE_DATA				0
-#define NXPWIFI_TYPE_AGGR_DATA				10
-#define NXPWIFI_TYPE_EVENT				3
+#define NXPWIFI_TYPE_DATA			0
+#define NXPWIFI_TYPE_CMD			1
+#define NXPWIFI_TYPE_EVENT			3
+#define NXPWIFI_TYPE_VDLL			4
+#define NXPWIFI_TYPE_AGGR_DATA			10
 
 #define MAX_BITMAP_RATES_SIZE			18
 
@@ -769,6 +770,14 @@ struct bus_aggr_params {
 	u16 tx_aggr_align;
 };
 
+struct vdll_dnld_ctrl {
+	u8 *pending_block;
+	u16 pending_block_len;
+	u8 *vdll_mem;
+	u32 vdll_len;
+	struct sk_buff *skb;
+};
+
 struct nxpwifi_if_ops {
 	int (*init_if)(struct nxpwifi_adapter *adapter);
 	void (*cleanup_if)(struct nxpwifi_adapter *adapter);
@@ -991,6 +1000,8 @@ struct nxpwifi_adapter {
 	struct delayed_work devdump_work;
 
 	bool ignore_btcoex_events;
+
+	struct vdll_dnld_ctrl vdll_ctrl;
 };
 
 void nxpwifi_process_tx_queue(struct nxpwifi_adapter *adapter);

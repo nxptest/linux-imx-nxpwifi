@@ -349,6 +349,15 @@ process_start:
 		if (adapter->tx_lock_flag)
 			continue;
 
+		if (!adapter->cmd_sent &&
+		    adapter->vdll_ctrl.pending_block) {
+			struct vdll_dnld_ctrl *ctrl = &adapter->vdll_ctrl;
+
+			nxpwifi_download_vdll_block(adapter, ctrl->pending_block,
+						    ctrl->pending_block_len);
+			ctrl->pending_block = NULL;
+		}
+
 		if (!adapter->cmd_sent && !adapter->curr_cmd) {
 			if (nxpwifi_exec_next_cmd(adapter) == -1) {
 				ret = -1;

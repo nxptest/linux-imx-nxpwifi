@@ -1831,7 +1831,6 @@ static int nxpwifi_sdio_host_to_card(struct nxpwifi_adapter *adapter,
 		}
 	} else {
 		adapter->cmd_sent = true;
-		/* Type must be NXPWIFI_TYPE_CMD */
 
 		if (pkt_len <= adapter->intf_hdr_len ||
 		    pkt_len > NXPWIFI_UPLD_SIZE)
@@ -1854,7 +1853,8 @@ static int nxpwifi_sdio_host_to_card(struct nxpwifi_adapter *adapter,
 						   port, 0);
 
 	if (ret) {
-		if (type == NXPWIFI_TYPE_CMD)
+		if (type == NXPWIFI_TYPE_CMD ||
+		    type == NXPWIFI_TYPE_VDLL)
 			adapter->cmd_sent = false;
 		if (type == NXPWIFI_TYPE_DATA) {
 			adapter->data_sent = false;

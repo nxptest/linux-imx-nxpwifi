@@ -396,6 +396,14 @@ nxpwifi_sta_event_bt_coex_wlan_para_change(struct nxpwifi_private *priv)
 	return 0;
 }
 
+static int
+nxpwifi_sta_event_vdll_ind(struct nxpwifi_private *priv)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	return nxpwifi_process_vdll_event(priv, adapter->event_skb);
+}
+
 static const struct nxpwifi_evt_entry evt_table_sta[] = {
 	{.event_cause = EVENT_LINK_LOST,
 	.event_handler = nxpwifi_sta_event_link_lost},
@@ -457,6 +465,8 @@ static const struct nxpwifi_evt_entry evt_table_sta[] = {
 	.event_handler = nxpwifi_sta_event_tx_status_report},
 	{.event_cause = EVENT_BT_COEX_WLAN_PARA_CHANGE,
 	.event_handler = nxpwifi_sta_event_bt_coex_wlan_para_change},
+	{.event_cause = EVENT_VDLL_IND,
+	.event_handler = nxpwifi_sta_event_vdll_ind},
 	{.event_cause = EVENT_DUMMY_HOST_WAKEUP_SIGNAL,
 	.event_handler = NULL},
 	{.event_cause = EVENT_MIB_CHANGED,

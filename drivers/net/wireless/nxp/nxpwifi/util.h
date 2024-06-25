@@ -8,6 +8,8 @@
 #ifndef _NXPWIFI_UTIL_H_
 #define _NXPWIFI_UTIL_H_
 
+struct nxpwifi_adapter;
+
 struct nxpwifi_private;
 
 struct nxpwifi_dma_mapping {
@@ -87,4 +89,11 @@ static inline void le16_unaligned_add_cpu(__le16 *var, u16 val)
 }
 
 int nxpwifi_append_data_tlv(u16 id, u8 *data, int len, u8 *pos, u8 *cmd_end);
+
+int nxpwifi_download_vdll_block(struct nxpwifi_adapter *adapter,
+				u8 *block, u16 block_len);
+
+int nxpwifi_process_vdll_event(struct nxpwifi_private *priv,
+			       struct sk_buff *skb);
+
 #endif /* !_NXPWIFI_UTIL_H_ */

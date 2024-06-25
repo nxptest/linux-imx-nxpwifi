@@ -297,6 +297,8 @@ static void nxpwifi_init_adapter(struct nxpwifi_adapter *adapter)
 	timer_setup(&adapter->wakeup_timer, wakeup_timer_fn, 0);
 	adapter->devdump_len = 0;
 	INIT_DELAYED_WORK(&adapter->devdump_work, fw_dump_work);
+	memset(&adapter->vdll_ctrl, 0, sizeof(adapter->vdll_ctrl));
+	adapter->vdll_ctrl.skb = dev_alloc_skb(NXPWIFI_SIZE_OF_CMD_BUFFER);
 }
 
 /* This function sets trans_start per tx_queue
@@ -373,6 +375,15 @@ nxpwifi_adapter_cleanup(struct nxpwifi_adapter *adapter)
 	nxpwifi_cancel_all_pending_cmd(adapter);
 	wake_up_interruptible(&adapter->cmd_wait_q.wait);
 	wake_up_interruptible(&adapter->hs_activate_wait_q);
+	if (adapter->vdll_ctrl.vdll_mem) {
+		vfree(adapter->vdll_ctrl.vdll_mem);
+		adapter->vdll_ctrl.vdll_mem = NULL;
+		adapter->vdll_ctrl.vdll_len = 0;
+	}
+	if (adapter->vdll_ctrl.skb) {
+		dev_kfree_skb_any(adapter->vdll_ctrl.skb);
+		adapter->vdll_ctrl.skb = NULL;
+	}
 }
 
 void nxpwifi_free_cmd_buffers(struct nxpwifi_adapter *adapter)
