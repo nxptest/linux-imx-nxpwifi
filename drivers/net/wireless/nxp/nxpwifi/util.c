@@ -850,7 +850,7 @@ int nxpwifi_process_vdll_event(struct nxpwifi_private *priv,
 			    vdll_id, offset, block_len);
 		if (offset <= ctrl->vdll_len) {
 			block_len =
-				min(block_len, (u16)(ctrl->vdll_len - offset));
+				min((u32)block_len, ctrl->vdll_len - offset);
 			if (!adapter->cmd_sent) {
 				ret = nxpwifi_download_vdll_block(adapter,
 								  ctrl->vdll_mem
