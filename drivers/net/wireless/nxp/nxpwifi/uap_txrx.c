@@ -6,7 +6,7 @@
  */
 
 #include "decl.h"
-#include "ioctl.h"
+#include "cfg.h"
 #include "main.h"
 #include "wmm.h"
 #include "11n_aggr.h"

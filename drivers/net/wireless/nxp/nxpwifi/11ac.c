@@ -6,7 +6,7 @@
  */
 
 #include "decl.h"
-#include "ioctl.h"
+#include "cfg.h"
 #include "fw.h"
 #include "main.h"
 #include "11ac.h"

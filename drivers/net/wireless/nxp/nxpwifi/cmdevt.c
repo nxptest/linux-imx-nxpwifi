@@ -7,7 +7,7 @@
 
 #include <asm/unaligned.h>
 #include "decl.h"
-#include "ioctl.h"
+#include "cfg.h"
 #include "util.h"
 #include "fw.h"
 #include "main.h"
