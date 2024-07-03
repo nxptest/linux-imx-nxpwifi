@@ -13,7 +13,6 @@
 #include <linux/kstrtox.h>
 #include <linux/module.h>
 #include <linux/sched.h>
-#include <linux/semaphore.h>
 #include <linux/ip.h>
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
