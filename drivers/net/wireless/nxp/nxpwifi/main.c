@@ -32,20 +32,20 @@ const u16 nxpwifi_1d_to_wmm_queue[8] = { 1, 0, 0, 1, 2, 2, 3, 3 };
  *      - Set default adapter structure parameters
  *      - Initialize locks
  *
- * In case of any errors during inittialization, this function also ensures
+ * In case of any errors during initialization, this function also ensures
  * proper cleanup before exiting.
  */
-static int nxpwifi_register(void *card, struct device *dev,
-			    struct nxpwifi_if_ops *if_ops, void **padapter)
+static struct nxpwifi_adapter *nxpwifi_register(void *card, struct device *dev,
+						struct nxpwifi_if_ops *if_ops)
 {
 	struct nxpwifi_adapter *adapter;
+	int ret = 0;
 	int i;
 
 	adapter = kzalloc(sizeof(*adapter), GFP_KERNEL);
 	if (!adapter)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
-	*padapter = adapter;
 	adapter->dev = dev;
 	adapter->card = card;
 
@@ -54,9 +54,11 @@ static int nxpwifi_register(void *card, struct device *dev,
 	adapter->debug_mask = debug_mask;
 
 	/* card specific initialization has been deferred until now .. */
-	if (adapter->if_ops.init_if)
-		if (adapter->if_ops.init_if(adapter))
+	if (adapter->if_ops.init_if) {
+		ret = adapter->if_ops.init_if(adapter);
+		if (ret)
 			goto error;
+	}
 
 	adapter->priv_num = 0;
 
@@ -64,8 +66,10 @@ static int nxpwifi_register(void *card, struct device *dev,
 		/* Allocate memory for private structure */
 		adapter->priv[i] =
 			kzalloc(sizeof(struct nxpwifi_private), GFP_KERNEL);
-		if (!adapter->priv[i])
+		if (!adapter->priv[i]) {
+			ret = -ENOMEM;
 			goto error;
+		}
 
 		adapter->priv[i]->adapter = adapter;
 		adapter->priv_num++;
@@ -74,7 +78,10 @@ static int nxpwifi_register(void *card, struct device *dev,
 
 	timer_setup(&adapter->cmd_timer, nxpwifi_cmd_timeout_func, 0);
 
-	return 0;
+	if (ret)
+		return ERR_PTR(ret);
+	else
+		return adapter;
 
 error:
 	nxpwifi_dbg(adapter, ERROR,
@@ -85,7 +92,7 @@ error:
 
 	kfree(adapter);
 
-	return -1;
+	return ERR_PTR(ret);
 }
 
 /* This function unregisters the device and performs all the necessary
@@ -1554,9 +1561,12 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 		 struct device *dev)
 {
 	struct nxpwifi_adapter *adapter;
+	int ret = 0;
 
-	if (nxpwifi_register(card, dev, if_ops, (void **)&adapter)) {
-		pr_err("%s: software init failed\n", __func__);
+	adapter = nxpwifi_register(card, dev, if_ops);
+	if (IS_ERR(adapter)) {
+		ret = PTR_ERR(adapter);
+		pr_err("%s: adapter register failed %d\n", __func__, ret);
 		goto err_init_sw;
 	}
 
@@ -1581,8 +1591,10 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 	adapter->workqueue =
 		alloc_workqueue("NXPWIFI_WORK_QUEUE",
 				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->workqueue)
+	if (!adapter->workqueue) {
+		ret = -ENOMEM;
 		goto err_kmalloc;
+	}
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work_queue);
 
@@ -1591,8 +1603,10 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 							WQ_HIGHPRI |
 							WQ_MEM_RECLAIM |
 							WQ_UNBOUND, 0);
-		if (!adapter->rx_workqueue)
+		if (!adapter->rx_workqueue) {
+			ret = -ENOMEM;
 			goto err_kmalloc;
+		}
 
 		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work_queue);
 	}
@@ -1600,25 +1614,29 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 	adapter->host_mlme_workqueue =
 		alloc_workqueue("NXPWIFI_HOST_MLME_WORK_QUEUE",
 				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->host_mlme_workqueue)
+	if (!adapter->host_mlme_workqueue) {
+		ret = -ENOMEM;
 		goto err_kmalloc;
+	}
 
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work_queue);
 
 	/* Register the device. Fill up the private data structure with relevant
 	 * information from the card.
 	 */
-	if (adapter->if_ops.register_dev(adapter)) {
+	ret = adapter->if_ops.register_dev(adapter);
+	if (ret) {
 		pr_err("%s: failed to register nxpwifi device\n", __func__);
 		goto err_registerdev;
 	}
 
-	if (nxpwifi_init_hw_fw(adapter, true)) {
+	ret = nxpwifi_init_hw_fw(adapter, true);
+	if (ret) {
 		pr_err("%s: firmware init failed\n", __func__);
 		goto err_init_fw;
 	}
 
-	return 0;
+	return ret;
 
 err_init_fw:
 	pr_debug("info: %s: unregister device\n", __func__);
@@ -1639,7 +1657,7 @@ err_kmalloc:
 
 err_init_sw:
 
-	return -1;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(nxpwifi_add_card);
 
