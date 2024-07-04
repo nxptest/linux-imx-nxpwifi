@@ -1001,6 +1001,7 @@ struct nxpwifi_adapter {
 	bool ignore_btcoex_events;
 
 	struct vdll_dnld_ctrl vdll_ctrl;
+	u64 roc_cookie_counter;
 };
 
 void nxpwifi_process_tx_queue(struct nxpwifi_adapter *adapter);

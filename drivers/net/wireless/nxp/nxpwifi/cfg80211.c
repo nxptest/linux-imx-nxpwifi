@@ -225,7 +225,7 @@ nxpwifi_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	tx_info->pkt_len = pkt_len;
 
 	nxpwifi_form_mgmt_frame(skb, buf, len);
-	*cookie = get_random_u32() | 1;
+	*cookie = nxpwifi_roc_cookie(priv->adapter);
 
 	if (ieee80211_is_action(mgmt->frame_control))
 		skb = nxpwifi_clone_skb_for_tx_status(priv,
@@ -272,15 +272,16 @@ nxpwifi_cfg80211_remain_on_channel(struct wiphy *wiphy,
 				   unsigned int duration, u64 *cookie)
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(wdev->netdev);
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	int ret;
 
 	if (!chan || !cookie) {
-		nxpwifi_dbg(priv->adapter, ERROR, "Invalid parameter for ROC\n");
+		nxpwifi_dbg(adapter, ERROR, "Invalid parameter for ROC\n");
 		return -EINVAL;
 	}
 
 	if (priv->roc_cfg.cookie) {
-		nxpwifi_dbg(priv->adapter, INFO,
+		nxpwifi_dbg(adapter, INFO,
 			    "info: ongoing ROC, cookie = 0x%llx\n",
 			    priv->roc_cfg.cookie);
 		return -EBUSY;
@@ -290,14 +291,14 @@ nxpwifi_cfg80211_remain_on_channel(struct wiphy *wiphy,
 					 duration);
 
 	if (!ret) {
-		*cookie = get_random_u32() | 1;
+		*cookie = nxpwifi_roc_cookie(adapter);
 		priv->roc_cfg.cookie = *cookie;
 		priv->roc_cfg.chan = *chan;
 
 		cfg80211_ready_on_channel(wdev, *cookie, chan,
 					  duration, GFP_ATOMIC);
 
-		nxpwifi_dbg(priv->adapter, INFO,
+		nxpwifi_dbg(adapter, INFO,
 			    "info: ROC, cookie = 0x%llx\n", *cookie);
 	}
 
@@ -3191,12 +3192,12 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 	u8 *varptr;
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP) {
-		nxpwifi_dbg(priv->adapter, ERROR, "Interface role is AP\n");
+		nxpwifi_dbg(adapter, ERROR, "Interface role is AP\n");
 		return -EFAULT;
 	}
 
 	if (priv->wdev.iftype != NL80211_IFTYPE_STATION) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "Interface type is not correct (type %d)\n",
 			    priv->wdev.iftype);
 		return -EINVAL;
@@ -3211,9 +3212,8 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 		    cfg80211_chandef_valid(&tmp_priv->bss_chandef)) {
 			if (!ieee80211_channel_equal
 			     (req->bss->channel, tmp_priv->bss_chandef.chan)) {
-				nxpwifi_dbg
-				(priv->adapter, MSG,
-				 "STA and AP must operate on same channel\n");
+				nxpwifi_dbg(adapter, MSG,
+					    "STA/AP must on the same channel\n");
 				return -EOPNOTSUPP;
 			}
 		}
@@ -3221,7 +3221,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 
 	if (priv->auth_alg != WLAN_AUTH_SAE &&
 	    (priv->auth_flag & HOST_MLME_AUTH_PENDING)) {
-		nxpwifi_dbg(priv->adapter, ERROR, "Pending auth on going\n");
+		nxpwifi_dbg(adapter, ERROR, "Pending auth on going\n");
 		return -EBUSY;
 	}
 
@@ -3250,7 +3250,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 		auth_alg = WLAN_AUTH_SAE;
 		break;
 	default:
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "unsupported auth type=%d\n", req->auth_type);
 		return -EOPNOTSUPP;
 	}
@@ -3261,7 +3261,8 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 						 AUTH_TX_DEFAULT_WAIT_TIME);
 
 		if (!ret) {
-			priv->roc_cfg.cookie = get_random_u32() | 1;
+			priv->roc_cfg.cookie =
+				nxpwifi_roc_cookie(adapter);
 			priv->roc_cfg.chan = *req->bss->channel;
 		} else {
 			return -EFAULT;
@@ -3281,7 +3282,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 			    NXPWIFI_MGMT_FRAME_HEADER_SIZE +
 			    pkt_len + sizeof(pkt_len));
 	if (!skb) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "allocate skb failed for management frame\n");
 		return -ENOMEM;
 	}
@@ -3337,7 +3338,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 	skb->priority = WMM_HIGHEST_PRIORITY;
 	__net_timestamp(skb);
 
-	nxpwifi_dbg(priv->adapter, MSG,
+	nxpwifi_dbg(adapter, MSG,
 		    "auth: send authentication to %pM\n", req->bss->bssid);
 
 	nxpwifi_queue_tx_pkt(priv, skb);
