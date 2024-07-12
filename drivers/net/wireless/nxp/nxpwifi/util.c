@@ -121,11 +121,10 @@ static int num_of_items = ARRAY_SIZE(items);
  * This function wakes up the function waiting on the init
  * wait queue for the firmware initialization to complete.
  */
-int nxpwifi_init_fw_complete(struct nxpwifi_adapter *adapter)
+void nxpwifi_init_fw_complete(struct nxpwifi_adapter *adapter)
 {
 	adapter->init_wait_q_woken = true;
 	wake_up_interruptible(&adapter->init_wait_q);
-	return 0;
 }
 
 /* This function sends init/shutdown command
@@ -143,7 +142,7 @@ int nxpwifi_init_shutdown_fw(struct nxpwifi_private *priv,
 	} else {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "unsupported parameter\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return nxpwifi_send_cmd(priv, cmd, HOST_ACT_GEN_SET, 0, NULL, true);
@@ -323,7 +322,7 @@ nxpwifi_parse_mgmt_packet(struct nxpwifi_private *priv, u8 *payload, u16 len,
 			/*we dont indicate BACK action frames to cfg80211*/
 			nxpwifi_dbg(priv->adapter, INFO,
 				    "drop BACK action frames");
-			return -1;
+			return -EINVAL;
 		default:
 			nxpwifi_dbg(priv->adapter, INFO,
 				    "unknown public action frame category %d\n",
@@ -387,22 +386,23 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 	struct rxpd *rx_pd;
 	u16 pkt_len;
 	struct ieee80211_hdr *ieee_hdr;
+	int ret;
 
 	if (!skb)
-		return -1;
+		return -ENOMEM;
 
 	if (!priv->mgmt_frame_mask ||
 	    priv->wdev.iftype == NL80211_IFTYPE_UNSPECIFIED) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "do not receive mgmt frames on uninitialized intf");
-		return -1;
+		return -EINVAL;
 	}
 
 	rx_pd = (struct rxpd *)skb->data;
 	pkt_len = le16_to_cpu(rx_pd->rx_pkt_length);
 	if (pkt_len < sizeof(struct ieee80211_hdr) + sizeof(pkt_len)) {
 		nxpwifi_dbg(priv->adapter, ERROR, "invalid rx_pkt_length");
-		return -1;
+		return -EINVAL;
 	}
 
 	skb_pull(skb, le16_to_cpu(rx_pd->rx_pkt_offset));
@@ -411,9 +411,10 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 
 	ieee_hdr = (void *)skb->data;
 	if (ieee80211_is_mgmt(ieee_hdr->frame_control)) {
-		if (nxpwifi_parse_mgmt_packet(priv, (u8 *)ieee_hdr,
-					      pkt_len, rx_pd))
-			return -1;
+		ret = nxpwifi_parse_mgmt_packet(priv, (u8 *)ieee_hdr,
+						pkt_len, rx_pd);
+		if (ret)
+			return ret;
 	}
 	/* Remove address4 */
 	memmove(skb->data + sizeof(struct ieee80211_hdr_3addr),
@@ -507,7 +508,7 @@ int nxpwifi_recv_packet(struct nxpwifi_private *priv, struct sk_buff *skb)
 	struct ethhdr *p_ethhdr;
 
 	if (!skb)
-		return -1;
+		return -ENOMEM;
 
 	priv->stats.rx_bytes += skb->len;
 	priv->stats.rx_packets++;
@@ -784,7 +785,7 @@ static int nxpwifi_get_vdll_image(struct nxpwifi_adapter *adapter, u32 vdll_len)
 		} else {
 			nxpwifi_dbg(adapter, ERROR,
 				    "Invalid VDLL length = %d, fw_len=%d\n",
-				    vdll_len, adapter->firmware->size);
+				    vdll_len, (int)adapter->firmware->size);
 			return -EINVAL;
 		}
 		if (req_fw) {

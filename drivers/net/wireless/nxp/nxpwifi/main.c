@@ -104,7 +104,7 @@ error:
  *      - Free private structures
  *      - Free adapter structure
  */
-static int nxpwifi_unregister(struct nxpwifi_adapter *adapter)
+static void nxpwifi_unregister(struct nxpwifi_adapter *adapter)
 {
 	s32 i;
 
@@ -131,7 +131,6 @@ static int nxpwifi_unregister(struct nxpwifi_adapter *adapter)
 	kfree(adapter->regd);
 
 	kfree(adapter);
-	return 0;
 }
 
 void nxpwifi_queue_main_work(struct nxpwifi_adapter *adapter)
@@ -160,7 +159,7 @@ static void nxpwifi_queue_rx_work(struct nxpwifi_adapter *adapter)
 	}
 }
 
-static int nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
+static void nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 {
 	struct sk_buff *skb;
 	struct nxpwifi_rxinfo *rx_info;
@@ -168,7 +167,7 @@ static int nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 	spin_lock_bh(&adapter->rx_proc_lock);
 	if (adapter->rx_processing || adapter->rx_locked) {
 		spin_unlock_bh(&adapter->rx_proc_lock);
-		goto exit_rx_proc;
+		return;
 	} else {
 		adapter->rx_processing = true;
 		spin_unlock_bh(&adapter->rx_proc_lock);
@@ -194,9 +193,6 @@ static int nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 	spin_lock_bh(&adapter->rx_proc_lock);
 	adapter->rx_processing = false;
 	spin_unlock_bh(&adapter->rx_proc_lock);
-
-exit_rx_proc:
-	return 0;
 }
 
 static void maybe_quirk_fw_disable_ds(struct nxpwifi_adapter *adapter)
@@ -230,9 +226,8 @@ static void maybe_quirk_fw_disable_ds(struct nxpwifi_adapter *adapter)
  *      - Execute pending commands
  *      - Transmit pending data packets
  */
-int nxpwifi_main_process(struct nxpwifi_adapter *adapter)
+void nxpwifi_main_process(struct nxpwifi_adapter *adapter)
 {
-	int ret = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&adapter->main_proc_lock, flags);
@@ -241,7 +236,7 @@ int nxpwifi_main_process(struct nxpwifi_adapter *adapter)
 	if (adapter->nxpwifi_processing || adapter->main_locked) {
 		adapter->more_task_flag = true;
 		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
-		return 0;
+		return;
 	}
 
 	adapter->nxpwifi_processing = true;
@@ -366,10 +361,8 @@ process_start:
 		}
 
 		if (!adapter->cmd_sent && !adapter->curr_cmd) {
-			if (nxpwifi_exec_next_cmd(adapter) == -1) {
-				ret = -1;
+			if (nxpwifi_exec_next_cmd(adapter))
 				break;
-			}
 		}
 
 		if ((adapter->scan_chan_gap_enabled ||
@@ -458,8 +451,6 @@ process_start:
 	}
 	adapter->nxpwifi_processing = false;
 	spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
-
-	return ret;
 }
 EXPORT_SYMBOL_GPL(nxpwifi_main_process);
 
@@ -508,7 +499,7 @@ static void nxpwifi_terminate_workqueue(struct nxpwifi_adapter *adapter)
  */
 static int _nxpwifi_fw_dpc(const struct firmware *firmware, void *context)
 {
-	int ret;
+	int ret = 0;
 	char fmt[64];
 	struct nxpwifi_adapter *adapter = context;
 	struct nxpwifi_fw_image fw;
@@ -519,6 +510,7 @@ static int _nxpwifi_fw_dpc(const struct firmware *firmware, void *context)
 	if (!firmware) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "Failed to get firmware %s\n", adapter->fw_name);
+		ret = -EINVAL;
 		goto err_dnld_fw;
 	}
 
@@ -532,20 +524,21 @@ static int _nxpwifi_fw_dpc(const struct firmware *firmware, void *context)
 	else
 		ret = nxpwifi_dnld_fw(adapter, &fw);
 
-	if (ret == -1)
+	if (ret)
 		goto err_dnld_fw;
 
 	nxpwifi_dbg(adapter, MSG, "WLAN FW is active\n");
 
 	/* enable host interrupt after fw dnld is successful */
 	if (adapter->if_ops.enable_int) {
-		if (adapter->if_ops.enable_int(adapter))
+		ret = adapter->if_ops.enable_int(adapter);
+		if (ret)
 			goto err_dnld_fw;
 	}
 
 	adapter->init_wait_q_woken = false;
 	ret = nxpwifi_init_fw(adapter);
-	if (ret == -1) {
+	if (ret != -EINPROGRESS) {
 		goto err_init_fw;
 	} else if (!ret) {
 		adapter->hw_status = NXPWIFI_HW_STATUS_READY;
@@ -643,7 +636,7 @@ done:
 	/* Tell all current and future waiters we're finished */
 	complete_all(fw_done);
 
-	return init_failed ? -EIO : 0;
+	return ret;
 }
 
 static void nxpwifi_fw_dpc(const struct firmware *firmware, void *context)
@@ -740,7 +733,7 @@ nxpwifi_bypass_tx_queue(struct nxpwifi_private *priv,
 
 /* Add buffer into wmm tx queue and queue work to transmit it.
  */
-int nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb)
+void nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb)
 {
 	struct netdev_queue *txq;
 	int index = nxpwifi_1d_to_wmm_queue[skb->priority];
@@ -764,8 +757,6 @@ int nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb)
 	}
 
 	nxpwifi_queue_main_work(priv->adapter);
-
-	return 0;
 }
 
 struct sk_buff *
@@ -1374,12 +1365,12 @@ static void nxpwifi_uninit_sw(struct nxpwifi_adapter *adapter)
 
 /* This function can be used for shutting down the adapter SW.
  */
-int nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter)
+void nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter)
 {
 	struct nxpwifi_private *priv;
 
 	if (!adapter)
-		return 0;
+		return;
 
 	wait_for_completion(adapter->fw_done);
 	/* Caller should ensure we aren't suspending while this happens */
@@ -1392,8 +1383,6 @@ int nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter)
 
 	nxpwifi_uninit_sw(adapter);
 	adapter->is_up = false;
-
-	return 0;
 }
 EXPORT_SYMBOL_GPL(nxpwifi_shutdown_sw);
 
@@ -1403,7 +1392,7 @@ EXPORT_SYMBOL_GPL(nxpwifi_shutdown_sw);
 int
 nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 {
-	int ret;
+	int ret = 0;
 
 	nxpwifi_init_lock_list(adapter);
 	if (adapter->if_ops.up_dev)
@@ -1426,8 +1415,10 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	adapter->workqueue =
 		alloc_workqueue("NXPWIFI_WORK_QUEUE",
 				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->workqueue)
+	if (!adapter->workqueue) {
+		ret = -ENOMEM;
 		goto err_kmalloc;
+	}
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work_queue);
 
@@ -1436,16 +1427,20 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 							WQ_HIGHPRI |
 							WQ_MEM_RECLAIM |
 							WQ_UNBOUND, 0);
-		if (!adapter->rx_workqueue)
+		if (!adapter->rx_workqueue) {
+			ret = -ENOMEM;
 			goto err_kmalloc;
+		}
 		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work_queue);
 	}
 
 	adapter->host_mlme_workqueue =
 		alloc_workqueue("NXPWIFI_HOST_MLME_WORK_QUEUE",
 				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->host_mlme_workqueue)
+	if (!adapter->host_mlme_workqueue) {
+		ret = -ENOMEM;
 		goto err_kmalloc;
+	}
 
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work_queue);
 
@@ -1455,7 +1450,8 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	 */
 	nxpwifi_dbg(adapter, INFO, "%s, nxpwifi_init_hw_fw()...\n", __func__);
 
-	if (nxpwifi_init_hw_fw(adapter, false)) {
+	ret = nxpwifi_init_hw_fw(adapter, false);
+	if (ret) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: firmware init failed\n", __func__);
 		goto err_init_fw;
@@ -1469,7 +1465,7 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	}
 	nxpwifi_dbg(adapter, INFO, "%s, successful\n", __func__);
 
-	return 0;
+	return ret;
 
 err_init_fw:
 	nxpwifi_dbg(adapter, ERROR, "info: %s: unregister device\n", __func__);
@@ -1489,7 +1485,7 @@ err_kmalloc:
 	complete_all(adapter->fw_done);
 	nxpwifi_dbg(adapter, INFO, "%s, error\n", __func__);
 
-	return -1;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(nxpwifi_reinit_sw);
 
@@ -1671,10 +1667,10 @@ EXPORT_SYMBOL_GPL(nxpwifi_add_card);
  *      - Unregister the device
  *      - Free the adapter structure
  */
-int nxpwifi_remove_card(struct nxpwifi_adapter *adapter)
+void nxpwifi_remove_card(struct nxpwifi_adapter *adapter)
 {
 	if (!adapter)
-		return 0;
+		return;
 
 	if (adapter->is_up)
 		nxpwifi_uninit_sw(adapter);
@@ -1691,8 +1687,6 @@ int nxpwifi_remove_card(struct nxpwifi_adapter *adapter)
 	nxpwifi_dbg(adapter, INFO,
 		    "info: free adapter\n");
 	nxpwifi_free_adapter(adapter);
-
-	return 0;
 }
 EXPORT_SYMBOL_GPL(nxpwifi_remove_card);
 

@@ -285,7 +285,7 @@ nxpwifi_is_bss_dynamic_wep(struct nxpwifi_private *priv,
  *
  * Compatibility is not matched while roaming, except for mode.
  */
-static s32
+static int
 nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 			      struct nxpwifi_bssdescriptor *bss_desc, u32 mode)
 {
@@ -308,7 +308,7 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 	if (bss_desc->chan_sw_ie_present) {
 		nxpwifi_dbg(adapter, INFO,
 			    "Don't connect to AP with WLAN_EID_CHANNEL_SWITCH\n");
-		return -1;
+		return -EPERM;
 	}
 
 	if (bss_desc->bss_mode == mode) {
@@ -335,7 +335,7 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 						    "is not supported by AP\n");
 					bss_desc->disable_11n = true;
 				} else {
-					return -1;
+					return -EINVAL;
 				}
 			}
 			return 0;
@@ -353,7 +353,7 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 						    "is not supported by AP\n");
 					bss_desc->disable_11n = true;
 				} else {
-					return -1;
+					return -EINVAL;
 				}
 			}
 			return 0;
@@ -364,11 +364,11 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 
 		/* Security doesn't match */
 		dbg_security_flags(ERROR, "failed", priv, bss_desc);
-		return -1;
+		return -EINVAL;
 	}
 
 	/* Mode doesn't match */
-	return -1;
+	return -EINVAL;
 }
 
 /* This function creates a channel list for the driver to scan, based
@@ -380,9 +380,9 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 static int
 nxpwifi_scan_create_channel_list(struct nxpwifi_private *priv,
 				 const struct nxpwifi_user_scan_cfg
-							*user_scan_in,
+				 *user_scan_in,
 				 struct nxpwifi_chan_scan_param_set
-							*scan_chan_list,
+				 *scan_chan_list,
 				 u8 filtered_scan)
 {
 	enum nl80211_band band;
@@ -447,9 +447,9 @@ nxpwifi_scan_create_channel_list(struct nxpwifi_private *priv,
 static int
 nxpwifi_bgscan_create_channel_list(struct nxpwifi_private *priv,
 				   const struct nxpwifi_bg_scan_cfg
-						*bgscan_cfg_in,
+				   *bgscan_cfg_in,
 				   struct nxpwifi_chan_scan_param_set
-						*scan_chan_list)
+				   *scan_chan_list)
 {
 	enum nl80211_band band;
 	struct ieee80211_supported_band *sband;
@@ -556,7 +556,7 @@ nxpwifi_scan_channel_list(struct nxpwifi_private *priv,
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "info: Scan: Null detect: %p, %p, %p\n",
 			    scan_cfg_out, tlv_o, scan_chan_list);
-		return -1;
+		return -EINVAL;
 	}
 
 	/* Check csa channel expiry before preparing scan list */
@@ -681,7 +681,7 @@ nxpwifi_scan_channel_list(struct nxpwifi_private *priv,
 				    "is over limit (%dms), scan skipped\n",
 				    total_scan_time,
 				    NXPWIFI_MAX_TOTAL_SCAN_TIME);
-			ret = -1;
+			ret = -EINVAL;
 			break;
 		}
 
@@ -712,10 +712,7 @@ nxpwifi_scan_channel_list(struct nxpwifi_private *priv,
 		}
 	}
 
-	if (ret)
-		return -1;
-
-	return 0;
+	return ret;
 }
 
 /* This function constructs a scan command configuration structure to use
@@ -1433,7 +1430,7 @@ int nxpwifi_scan_networks(struct nxpwifi_private *priv,
 	    test_bit(NXPWIFI_IS_CMD_TIMEDOUT, &adapter->work_flags)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "Ignore scan. Card removed or firmware in bad state\n");
-		return -EFAULT;
+		return -EPERM;
 	}
 
 	spin_lock_bh(&adapter->nxpwifi_cmd_lock);
@@ -1537,10 +1534,10 @@ int nxpwifi_cmd_802_11_scan(struct host_cmd_ds_command *cmd,
 int nxpwifi_check_network_compatibility(struct nxpwifi_private *priv,
 					struct nxpwifi_bssdescriptor *bss_desc)
 {
-	int ret = -1;
+	int ret = 0;
 
 	if (!bss_desc)
-		return -1;
+		return -EINVAL;
 
 	if ((nxpwifi_get_cfp(priv, (u8)bss_desc->bss_band,
 			     (u16)bss_desc->channel, 0))) {
@@ -1617,7 +1614,7 @@ done:
 	 */
 	kfree(bss_desc->beacon_buf);
 	kfree(bss_desc);
-	return 0;
+	return ret;
 }
 
 static int nxpwifi_update_curr_bss_params(struct nxpwifi_private *priv,
@@ -1656,7 +1653,7 @@ done:
 	 */
 	kfree(bss_desc->beacon_buf);
 	kfree(bss_desc);
-	return 0;
+	return ret;
 }
 
 static int
@@ -1692,7 +1689,7 @@ nxpwifi_parse_single_response_buf(struct nxpwifi_private *priv, u8 **bss_info,
 	if (!beacon_size || beacon_size > *bytes_left) {
 		*bss_info += *bytes_left;
 		*bytes_left = 0;
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	/* Initialize the current working beacon pointer for this BSS
@@ -1713,7 +1710,7 @@ nxpwifi_parse_single_response_buf(struct nxpwifi_private *priv, u8 **bss_info,
 	    sizeof(struct nxpwifi_fixed_bcn_param)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "InterpretIE: not enough bytes left\n");
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	memcpy(bssid, current_ptr, ETH_ALEN);
@@ -1895,12 +1892,10 @@ nxpwifi_active_scan_req_for_passive_chan(struct nxpwifi_private *priv)
 
 	memset(&priv->hidden_chan, 0, sizeof(priv->hidden_chan));
 
-	if (ret) {
+	if (ret)
 		dev_err(priv->adapter->dev, "scan failed: %d\n", ret);
-		return ret;
-	}
 
-	return 0;
+	return ret;
 }
 
 static void nxpwifi_check_next_scan_command(struct nxpwifi_private *priv)
@@ -2055,7 +2050,7 @@ int nxpwifi_ret_802_11_scan(struct nxpwifi_private *priv,
 		nxpwifi_dbg(adapter, ERROR,
 			    "SCAN_RESP: too many AP returned (%d)\n",
 			    scan_rsp->number_of_sets);
-		ret = -1;
+		ret = -EINVAL;
 		goto check_next_scan;
 	}
 
@@ -2381,6 +2376,7 @@ int nxpwifi_cmd_802_11_bg_scan_config(struct nxpwifi_private *priv,
 int nxpwifi_stop_bg_scan(struct nxpwifi_private *priv)
 {
 	struct nxpwifi_bg_scan_cfg *bgscan_cfg;
+	int ret;
 
 	if (!priv->sched_scanning) {
 		dev_dbg(priv->adapter->dev, "bgscan already stopped!\n");
@@ -2395,16 +2391,13 @@ int nxpwifi_stop_bg_scan(struct nxpwifi_private *priv)
 	bgscan_cfg->action = NXPWIFI_BGSCAN_ACT_SET;
 	bgscan_cfg->enable = false;
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_802_11_BG_SCAN_CONFIG,
-			     HOST_ACT_GEN_SET, 0, bgscan_cfg, true)) {
-		kfree(bgscan_cfg);
-		return -EFAULT;
-	}
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_802_11_BG_SCAN_CONFIG,
+			       HOST_ACT_GEN_SET, 0, bgscan_cfg, true);
+	if (!ret)
+		priv->sched_scanning = false;
 
 	kfree(bgscan_cfg);
-	priv->sched_scanning = false;
-
-	return 0;
+	return ret;
 }
 
 static void
@@ -2546,7 +2539,7 @@ int nxpwifi_handle_event_ext_scan_report(struct nxpwifi_private *priv,
 		nxpwifi_dbg(adapter, ERROR,
 			    "EXT_SCAN: Invalid number of AP returned (%d)!!\n",
 			    num_of_set);
-		ret = -1;
+		ret = -EINVAL;
 		goto check_next_scan;
 	}
 
@@ -2742,7 +2735,7 @@ int nxpwifi_request_scan(struct nxpwifi_private *priv,
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "%s: acquire semaphore fail\n",
 			    __func__);
-		return -1;
+		return -EPERM;
 	}
 
 	priv->adapter->scan_wait_q_woken = false;

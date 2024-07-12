@@ -275,7 +275,7 @@ nxpwifi_uap_bss_param_prepare(u8 *tlv, void *cmd_buf, u16 *param_size)
 			sizeof(struct nxpwifi_ie_types_header));
 		auth_type->auth_type = (u8)bss_cfg->auth_mode;
 		auth_type->pwe_derivation = 0;
-		auth_type->transition_disable;
+		auth_type->transition_disable = 0;
 		cmd_size += sizeof(struct host_cmd_tlv_auth_type);
 		tlv += sizeof(struct host_cmd_tlv_auth_type);
 	}
@@ -363,7 +363,7 @@ static int nxpwifi_uap_custom_ie_prepare(u8 *tlv, void *cmd_buf, u16 *ie_size)
 	struct nxpwifi_ie_types_header *tlv_ie = (void *)tlv;
 
 	if (!ap_ie || !ap_ie->len)
-		return -1;
+		return -EINVAL;
 
 	*ie_size += le16_to_cpu(ap_ie->len) +
 			sizeof(struct nxpwifi_ie_types_header);
@@ -389,6 +389,7 @@ nxpwifi_cmd_uap_sys_config(struct nxpwifi_private *priv,
 	u8 *tlv;
 	u16 cmd_size, param_size, ie_size;
 	struct host_cmd_ds_sys_config *sys_cfg;
+	int ret = 0;
 
 	cmd->command = cpu_to_le16(HOST_CMD_UAP_SYS_CONFIG);
 	cmd_size = (u16)(sizeof(struct host_cmd_ds_sys_config) + S_DS_GEN);
@@ -399,21 +400,23 @@ nxpwifi_cmd_uap_sys_config(struct nxpwifi_private *priv,
 	switch (cmd_type) {
 	case UAP_BSS_PARAMS_I:
 		param_size = cmd_size;
-		if (nxpwifi_uap_bss_param_prepare(tlv, data_buf, &param_size))
-			return -1;
+		ret = nxpwifi_uap_bss_param_prepare(tlv, data_buf, &param_size);
+		if (ret)
+			return ret;
 		cmd->size = cpu_to_le16(param_size);
 		break;
 	case UAP_CUSTOM_IE_I:
 		ie_size = cmd_size;
-		if (nxpwifi_uap_custom_ie_prepare(tlv, data_buf, &ie_size))
-			return -1;
+		ret = nxpwifi_uap_custom_ie_prepare(tlv, data_buf, &ie_size);
+		if (ret)
+			return ret;
 		cmd->size = cpu_to_le16(ie_size);
 		break;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -546,7 +549,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		sta_ptr = nxpwifi_get_sta_entry(priv, add_sta->peer_mac);
 
 	if (!sta_ptr)
-		return -1;
+		return -EINVAL;
 
 	memcpy(new_sta->peer_mac, add_sta->peer_mac, ETH_ALEN);
 
@@ -579,7 +582,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_EXT_CAPABILITY,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 	}
@@ -591,7 +594,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_SUPP_RATES,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 	}
@@ -604,7 +607,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_QOS_CAPA,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 		sta_ptr->is_wmm_enabled = 1;
@@ -617,7 +620,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_HT_CAPABILITY,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 		sta_ptr->is_11n_enabled = 1;
@@ -635,7 +638,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_VHT_CAPABILITY,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 		sta_ptr->is_11ac_enabled = 1;
@@ -648,7 +651,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_OPMODE_NOTIF,
 						  data, len, pos, cmd_end);
 		if (!tlv_len)
-			return -1;
+			return -EINVAL;
 		pos += tlv_len;
 		cmd->size += tlv_len;
 	}
@@ -709,7 +712,7 @@ int nxpwifi_uap_prepare_cmd(struct nxpwifi_private *priv,
 	struct host_cmd_ds_command *cmd =
 		(struct host_cmd_ds_command *)cmd_node->skb->data;
 	void *data_buf = cmd_node->data_buf;
-	int i, ret = -1;
+	int i, ret = -EINVAL;
 
 	for (i = 0; i < ARRAY_SIZE(cmd_table_uap); i++) {
 		if (cmd_no == cmd_table_uap[i].cmd_no) {
@@ -729,7 +732,7 @@ int nxpwifi_uap_prepare_cmd(struct nxpwifi_private *priv,
 			    "%s: unknown command: %#x\n",
 			    __func__, cmd_no);
 	else
-		nxpwifi_dbg(adapter, EVENT,
+		nxpwifi_dbg(adapter, CMD,
 			    "%s: command: %#x\n",
 			    __func__, cmd_no);
 
@@ -1141,19 +1144,23 @@ void nxpwifi_uap_set_channel(struct nxpwifi_private *priv,
 int nxpwifi_config_start_uap(struct nxpwifi_private *priv,
 			     struct nxpwifi_uap_bss_param *bss_cfg)
 {
-	if (nxpwifi_send_cmd(priv, HOST_CMD_UAP_SYS_CONFIG,
-			     HOST_ACT_GEN_SET,
-			     UAP_BSS_PARAMS_I, bss_cfg, true)) {
+	int ret;
+
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_UAP_SYS_CONFIG,
+			       HOST_ACT_GEN_SET,
+			       UAP_BSS_PARAMS_I, bss_cfg, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to set AP configuration\n");
-		return -1;
+		return ret;
 	}
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_START,
-			     HOST_ACT_GEN_SET, 0, NULL, true)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_START,
+			       HOST_ACT_GEN_SET, 0, NULL, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to start the BSS\n");
-		return -1;
+		return ret;
 	}
 
 	if (priv->sec_info.wep_enabled)
@@ -1161,10 +1168,9 @@ int nxpwifi_config_start_uap(struct nxpwifi_private *priv,
 	else
 		priv->curr_pkt_filter &= ~HOST_ACT_MAC_WEP_ENABLE;
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_MAC_CONTROL,
-			     HOST_ACT_GEN_SET, 0,
-			     &priv->curr_pkt_filter, true))
-		return -1;
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_MAC_CONTROL,
+			       HOST_ACT_GEN_SET, 0,
+			       &priv->curr_pkt_filter, true);
 
-	return 0;
+	return ret;
 }

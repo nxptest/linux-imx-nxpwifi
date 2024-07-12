@@ -88,7 +88,7 @@ int nxpwifi_process_rx_packet(struct nxpwifi_private *priv,
 	    rx_pkt_off > skb->len) {
 		priv->stats.rx_dropped++;
 		dev_kfree_skb_any(skb);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (sizeof(*rx_pkt_hdr) + rx_pkt_off <= skb->len &&
@@ -156,7 +156,7 @@ int nxpwifi_process_rx_packet(struct nxpwifi_private *priv,
 	}
 
 	ret = nxpwifi_recv_packet(priv, skb);
-	if (ret == -1)
+	if (ret)
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "recv packet failed\n");
 

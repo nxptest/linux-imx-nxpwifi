@@ -172,7 +172,7 @@ static int nxpwifi_allocate_adapter(struct nxpwifi_adapter *adapter)
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: failed to alloc cmd buffer\n",
 			    __func__);
-		return -1;
+		return ret;
 	}
 
 	adapter->sleep_cfm =
@@ -183,7 +183,7 @@ static int nxpwifi_allocate_adapter(struct nxpwifi_adapter *adapter)
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: failed to alloc sleep cfm\t"
 			    " cmd buffer\n", __func__);
-		return -1;
+		return -ENOMEM;
 	}
 	skb_reserve(adapter->sleep_cfm, INTF_HEADER_LEN);
 
@@ -401,7 +401,7 @@ void nxpwifi_free_cmd_buffers(struct nxpwifi_adapter *adapter)
 /*  This function intializes the lock variables and
  *  the list heads.
  */
-int nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
+void nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
 {
 	struct nxpwifi_private *priv;
 	s32 i, j;
@@ -456,8 +456,6 @@ int nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
 		spin_lock_init(&priv->ack_status_lock);
 		idr_init(&priv->ack_status_frames);
 	}
-
-	return 0;
 }
 
 /* This function initializes the firmware.
@@ -474,7 +472,8 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 {
 	int ret;
 	struct nxpwifi_private *priv;
-	u8 i, first_sta = true;
+	u8 i;
+	bool first_sta = true;
 	int is_cmd_pend_q_empty;
 
 	adapter->hw_status = NXPWIFI_HW_STATUS_INITIALIZING;
@@ -482,7 +481,7 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 	/* Allocate memory for member of adapter structure */
 	ret = nxpwifi_allocate_adapter(adapter);
 	if (ret)
-		return -1;
+		return ret;
 
 	/* Initialize adapter structure */
 	nxpwifi_init_adapter(adapter);
@@ -494,7 +493,7 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 			/* Initialize private structure */
 			ret = nxpwifi_init_priv(priv);
 			if (ret)
-				return -1;
+				return ret;
 		}
 	}
 
@@ -502,8 +501,8 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 		if (adapter->priv[i]) {
 			ret = nxpwifi_sta_init_cmd(adapter->priv[i],
 						   first_sta, true);
-			if (ret == -1)
-				return -1;
+			if (ret && ret != -EINPROGRESS)
+				return ret;
 
 			first_sta = false;
 		}
@@ -512,13 +511,11 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 	spin_lock_bh(&adapter->cmd_pending_q_lock);
 	is_cmd_pend_q_empty = list_empty(&adapter->cmd_pending_q);
 	spin_unlock_bh(&adapter->cmd_pending_q_lock);
-	if (!is_cmd_pend_q_empty) {
+	if (!is_cmd_pend_q_empty)
 		/* Send the first command in queue and return */
-		if (nxpwifi_main_process(adapter) != -1)
-			ret = -EINPROGRESS;
-	} else {
+		nxpwifi_main_process(adapter);
+	else
 		adapter->hw_status = NXPWIFI_HW_STATUS_READY;
-	}
 
 	return ret;
 }

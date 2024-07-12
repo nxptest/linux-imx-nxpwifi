@@ -120,21 +120,21 @@ int nxpwifi_send_null_packet(struct nxpwifi_private *priv, u8 flags)
 	struct nxpwifi_txinfo *tx_info = NULL;
 
 	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
-		return -1;
+		return -EPERM;
 
 	if (!priv->media_connected)
-		return -1;
+		return -EPERM;
 
 	if (adapter->data_sent)
-		return -1;
+		return -EBUSY;
 
 	if (adapter->if_ops.is_port_ready &&
 	    !adapter->if_ops.is_port_ready(priv))
-		return -1;
+		return -EPERM;
 
 	skb = dev_alloc_skb(data_len);
 	if (!skb)
-		return -1;
+		return -ENOMEM;
 
 	tx_info = NXPWIFI_SKB_TXCB(skb);
 	memset(tx_info, 0, sizeof(*tx_info));
@@ -166,13 +166,6 @@ int nxpwifi_send_null_packet(struct nxpwifi_private *priv, u8 flags)
 			    __func__, ret);
 		adapter->dbg.num_tx_host_to_card_failure++;
 		break;
-	case -1:
-		dev_kfree_skb_any(skb);
-		nxpwifi_dbg(adapter, ERROR,
-			    "%s: host_to_card failed: ret=%d\n",
-			    __func__, ret);
-		adapter->dbg.num_tx_host_to_card_failure++;
-		break;
 	case 0:
 		dev_kfree_skb_any(skb);
 		nxpwifi_dbg(adapter, DATA,
@@ -184,6 +177,11 @@ int nxpwifi_send_null_packet(struct nxpwifi_private *priv, u8 flags)
 		adapter->tx_lock_flag = true;
 		break;
 	default:
+		dev_kfree_skb_any(skb);
+		nxpwifi_dbg(adapter, ERROR,
+			    "%s: host_to_card failed: ret=%d\n",
+			    __func__, ret);
+		adapter->dbg.num_tx_host_to_card_failure++;
 		break;
 	}
 

@@ -630,10 +630,9 @@ nxpwifi_memrw_write(struct file *file, const char __user *ubuf, size_t count,
 	}
 
 	memcpy(&priv->mem_rw, &mem_rw, sizeof(mem_rw));
-	if (nxpwifi_send_cmd(priv, HOST_CMD_MEM_ACCESS, cmd_action, 0,
-			     &mem_rw, true))
-		ret = -1;
-	else
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_MEM_ACCESS, cmd_action, 0,
+			       &mem_rw, true);
+	if (!ret)
 		ret = count;
 
 done:

@@ -172,7 +172,7 @@ static int nxpwifi_get_common_rates(struct nxpwifi_private *priv, u8 *rate1,
 			    "is not compatible with the network\n",
 			    priv->data_rate);
 
-		ret = -1;
+		ret = -EPERM;
 		goto done;
 	}
 
@@ -192,25 +192,26 @@ nxpwifi_setup_rates_from_bssdesc(struct nxpwifi_private *priv,
 {
 	u8 card_rates[NXPWIFI_SUPPORTED_RATES];
 	u32 card_rates_size;
+	int ret;
 
 	/* Copy AP supported rates */
 	memcpy(out_rates, bss_desc->supported_rates, NXPWIFI_SUPPORTED_RATES);
 	/* Get the STA supported rates */
 	card_rates_size = nxpwifi_get_active_data_rates(priv, card_rates);
 	/* Get the common rates between AP and STA supported rates */
-	if (nxpwifi_get_common_rates(priv, out_rates, NXPWIFI_SUPPORTED_RATES,
-				     card_rates, card_rates_size)) {
+	ret = nxpwifi_get_common_rates(priv, out_rates, NXPWIFI_SUPPORTED_RATES,
+				       card_rates, card_rates_size);
+	if (ret) {
 		*out_rates_size = 0;
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "%s: cannot get common rates\n",
 			    __func__);
-		return -1;
+	} else {
+		*out_rates_size =
+			min_t(size_t, strlen(out_rates), NXPWIFI_SUPPORTED_RATES);
 	}
 
-	*out_rates_size =
-		min_t(size_t, strlen(out_rates), NXPWIFI_SUPPORTED_RATES);
-
-	return 0;
+	return ret;
 }
 
 /* This function appends a WPS IE. It is called from the network join command
@@ -276,7 +277,7 @@ static int nxpwifi_append_rsn_ie_wpa_wpa2(struct nxpwifi_private *priv,
 		memcpy(rsn_ie_tlv->rsn_ie, &priv->wpa_ie[2],
 		       le16_to_cpu(rsn_ie_tlv->header.len));
 	else
-		return -1;
+		return -ENOMEM;
 
 	rsn_ie_len = sizeof(rsn_ie_tlv->header) +
 					le16_to_cpu(rsn_ie_tlv->header.len);
@@ -329,6 +330,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 	u16 tmp_cap;
 	u8 *pos;
 	int rsn_ie_len = 0;
+	int ret;
 
 	pos = (u8 *)assoc;
 
@@ -378,9 +380,10 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 	pos += sizeof(ss_tlv->header) + le16_to_cpu(ss_tlv->header.len);
 
 	/* Get the common rates supported between the driver and the BSS Desc */
-	if (nxpwifi_setup_rates_from_bssdesc
-	    (priv, bss_desc, rates, &rates_size))
-		return -1;
+	ret = nxpwifi_setup_rates_from_bssdesc(priv, bss_desc,
+					       rates, &rates_size);
+	if (ret)
+		return ret;
 
 	/* Save the data rates into Current BSS state structure */
 	priv->curr_bss_params.num_of_rates = rates_size;
@@ -459,8 +462,8 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 		if (priv->sec_info.wpa_enabled || priv->sec_info.wpa2_enabled)
 			rsn_ie_len = nxpwifi_append_rsn_ie_wpa_wpa2(priv, &pos);
 
-		if (rsn_ie_len == -1)
-			return -1;
+		if (rsn_ie_len == -ENOMEM)
+			return -ENOMEM;
 	}
 
 	if (ISSUPP_11NENABLED(priv->adapter->fw_cap_info) &&
@@ -503,7 +506,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 		    tmp_cap, CAPINFO_MASK);
 	assoc->cap_info_bitmap = cpu_to_le16(tmp_cap);
 
-	return 0;
+	return ret;
 }
 
 static const char *assoc_failure_reason_to_str(u16 cap_info)
@@ -795,7 +798,7 @@ int nxpwifi_associate(struct nxpwifi_private *priv,
 	 */
 	if ((GET_BSS_ROLE(priv) != NXPWIFI_BSS_ROLE_STA) ||
 	    bss_desc->bss_mode != NL80211_IFTYPE_STATION)
-		return -1;
+		return -EINVAL;
 
 	if (ISSUPP_11ACENABLED(priv->adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n && !bss_desc->disable_11ac &&
@@ -851,12 +854,14 @@ int nxpwifi_deauthenticate(struct nxpwifi_private *priv, u8 *mac)
 	priv->auth_alg = WLAN_AUTH_NONE;
 	priv->host_mlme_reg = false;
 	priv->mgmt_frame_mask = 0;
-	if (nxpwifi_send_cmd(priv, HOST_CMD_MGMT_FRAME_REG,
-			     HOST_ACT_GEN_SET, 0,
-			     &priv->mgmt_frame_mask, false)) {
+
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_MGMT_FRAME_REG,
+			       HOST_ACT_GEN_SET, 0,
+			       &priv->mgmt_frame_mask, false);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "could not unregister mgmt frame rx\n");
-		return -1;
+		return ret;
 	}
 
 	switch (priv->bss_mode) {
@@ -867,8 +872,8 @@ int nxpwifi_deauthenticate(struct nxpwifi_private *priv, u8 *mac)
 					      true, GFP_KERNEL);
 		break;
 	case NL80211_IFTYPE_AP:
-		return nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_STOP,
-					HOST_ACT_GEN_SET, 0, NULL, true);
+		ret = nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_STOP,
+				       HOST_ACT_GEN_SET, 0, NULL, true);
 	default:
 		break;
 	}

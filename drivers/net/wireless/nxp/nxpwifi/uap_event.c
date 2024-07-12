@@ -124,7 +124,7 @@ nxpwifi_uap_event_sta_assoc(struct nxpwifi_private *priv)
 		nxpwifi_dbg(adapter, ERROR,
 			    "could not create station entry!\n");
 		kfree(sinfo);
-		return -1;
+		return -ENOENT;
 	}
 
 	if (!priv->ap_11n_enabled) {

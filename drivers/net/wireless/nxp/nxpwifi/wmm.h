@@ -37,23 +37,6 @@ nxpwifi_get_tid(struct nxpwifi_ra_list_tbl *ptr)
 	return skb->priority;
 }
 
-/* This function checks if a RA list is empty or not.
- */
-static inline u8
-nxpwifi_wmm_is_ra_list_empty(struct list_head *ra_list_hhead)
-{
-	struct nxpwifi_ra_list_tbl *ra_list;
-	int is_list_empty;
-
-	list_for_each_entry(ra_list, ra_list_hhead, list) {
-		is_list_empty = skb_queue_empty(&ra_list->skb_head);
-		if (!is_list_empty)
-			return false;
-	}
-
-	return true;
-}
-
 void nxpwifi_wmm_add_buf_txqueue(struct nxpwifi_private *priv,
 				 struct sk_buff *skb);
 void nxpwifi_wmm_add_buf_bypass_txqueue(struct nxpwifi_private *priv,
@@ -62,12 +45,12 @@ void nxpwifi_ralist_add(struct nxpwifi_private *priv, const u8 *ra);
 void nxpwifi_rotate_priolists(struct nxpwifi_private *priv,
 			      struct nxpwifi_ra_list_tbl *ra, int tid);
 
-int nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter);
-int nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter);
+bool nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter);
+bool nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter);
 void nxpwifi_wmm_process_tx(struct nxpwifi_adapter *adapter);
 void nxpwifi_process_bypass_tx(struct nxpwifi_adapter *adapter);
-int nxpwifi_is_ralist_valid(struct nxpwifi_private *priv,
-			    struct nxpwifi_ra_list_tbl *ra_list, int tid);
+bool nxpwifi_is_ralist_valid(struct nxpwifi_private *priv,
+			     struct nxpwifi_ra_list_tbl *ra_list, int tid);
 
 u8 nxpwifi_wmm_compute_drv_pkt_delay(struct nxpwifi_private *priv,
 				     const struct sk_buff *skb);

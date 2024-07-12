@@ -157,7 +157,7 @@ nxpwifi_11n_aggregate_pkt(struct nxpwifi_private *priv,
 					       GFP_ATOMIC);
 	if (!skb_aggr) {
 		spin_unlock_bh(&priv->wmm.ra_list_spinlock);
-		return -1;
+		return -ENOMEM;
 	}
 
 	/* skb_aggr->data already 64 byte align, just reserve bus interface
@@ -193,7 +193,7 @@ nxpwifi_11n_aggregate_pkt(struct nxpwifi_private *priv,
 
 		if (!nxpwifi_is_ralist_valid(priv, pra_list, ptrindex)) {
 			spin_unlock_bh(&priv->wmm.ra_list_spinlock);
-			return -1;
+			return -ENOENT;
 		}
 
 		if (skb_tailroom(skb_aggr) < pad) {
@@ -238,7 +238,7 @@ nxpwifi_11n_aggregate_pkt(struct nxpwifi_private *priv,
 		if (!nxpwifi_is_ralist_valid(priv, pra_list, ptrindex)) {
 			spin_unlock_bh(&priv->wmm.ra_list_spinlock);
 			nxpwifi_write_data_complete(adapter, skb_aggr, 1, -1);
-			return -1;
+			return -EINVAL;
 		}
 		if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_STA &&
 		    adapter->pps_uapsd_mode && adapter->tx_lock_flag) {
@@ -257,18 +257,16 @@ nxpwifi_11n_aggregate_pkt(struct nxpwifi_private *priv,
 		spin_unlock_bh(&priv->wmm.ra_list_spinlock);
 		nxpwifi_dbg(adapter, ERROR, "data: -EBUSY is returned\n");
 		break;
-	case -1:
-		nxpwifi_dbg(adapter, ERROR, "%s: host_to_card failed: %#x\n",
-			    __func__, ret);
-		adapter->dbg.num_tx_host_to_card_failure++;
-		nxpwifi_write_data_complete(adapter, skb_aggr, 1, ret);
-		return 0;
 	case -EINPROGRESS:
 		break;
 	case 0:
 		nxpwifi_write_data_complete(adapter, skb_aggr, 1, ret);
 		break;
 	default:
+		nxpwifi_dbg(adapter, ERROR, "%s: host_to_card failed: %#x\n",
+			    __func__, ret);
+		adapter->dbg.num_tx_host_to_card_failure++;
+		nxpwifi_write_data_complete(adapter, skb_aggr, 1, ret);
 		break;
 	}
 	if (ret != -EBUSY)

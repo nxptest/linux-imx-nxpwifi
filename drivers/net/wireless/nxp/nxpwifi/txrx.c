@@ -40,7 +40,7 @@ int nxpwifi_handle_rx_packet(struct nxpwifi_adapter *adapter,
 		nxpwifi_dbg(adapter, ERROR,
 			    "data: priv not found. Drop RX packet\n");
 		dev_kfree_skb_any(skb);
-		return -1;
+		return -EINVAL;
 	}
 
 	nxpwifi_dbg_dump(adapter, DAT_D, "rx pkt:", skb->data,
@@ -124,13 +124,6 @@ out:
 		}
 		nxpwifi_dbg(adapter, ERROR, "data: -EBUSY is returned\n");
 		break;
-	case -1:
-		nxpwifi_dbg(adapter, ERROR,
-			    "nxpwifi_write_data_async failed: 0x%X\n",
-			    ret);
-		adapter->dbg.num_tx_host_to_card_failure++;
-		nxpwifi_write_data_complete(adapter, skb, 0, ret);
-		break;
 	case -EINPROGRESS:
 		break;
 	case -EINVAL:
@@ -142,6 +135,11 @@ out:
 		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	default:
+		nxpwifi_dbg(adapter, ERROR,
+			    "nxpwifi_write_data_async failed: 0x%X\n",
+			    ret);
+		adapter->dbg.num_tx_host_to_card_failure++;
+		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	}
 
@@ -194,18 +192,16 @@ static int nxpwifi_host_to_card(struct nxpwifi_adapter *adapter,
 			atomic_inc(&adapter->tx_queued);
 		nxpwifi_dbg(adapter, ERROR, "data: -EBUSY is returned\n");
 		break;
-	case -1:
-		nxpwifi_dbg(adapter, ERROR,
-			    "nxpwifi_write_data_async failed: 0x%X\n", ret);
-		adapter->dbg.num_tx_host_to_card_failure++;
-		nxpwifi_write_data_complete(adapter, skb, 0, ret);
-		break;
 	case -EINPROGRESS:
 		break;
 	case 0:
 		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	default:
+		nxpwifi_dbg(adapter, ERROR,
+			    "nxpwifi_write_data_async failed: 0x%X\n", ret);
+		adapter->dbg.num_tx_host_to_card_failure++;
+		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	}
 	return ret;
@@ -220,7 +216,7 @@ nxpwifi_dequeue_tx_queue(struct nxpwifi_adapter *adapter)
 
 	skb = skb_dequeue(&adapter->tx_data_q);
 	if (!skb)
-		return -1;
+		return -ENOMEM;
 
 	tx_info = NXPWIFI_SKB_TXCB(skb);
 	if (tx_info->flags & NXPWIFI_BUF_FLAG_AGGR_PKT)

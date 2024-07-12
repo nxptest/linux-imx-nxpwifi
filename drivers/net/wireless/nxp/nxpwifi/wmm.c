@@ -426,7 +426,7 @@ nxpwifi_wmm_init(struct nxpwifi_adapter *adapter)
 	}
 }
 
-int nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter)
+bool nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter)
 {
 	struct nxpwifi_private *priv;
 	int i;
@@ -447,8 +447,7 @@ int nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter)
 
 /* This function checks if WMM Tx queue is empty.
  */
-int
-nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter)
+bool nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter)
 {
 	int i;
 	struct nxpwifi_private *priv;
@@ -688,9 +687,8 @@ nxpwifi_wmm_del_peer_ra_list(struct nxpwifi_private *priv, const u8 *ra_addr)
 /* This function checks if a particular RA list node exists in a given TID
  * table index.
  */
-int
-nxpwifi_is_ralist_valid(struct nxpwifi_private *priv,
-			struct nxpwifi_ra_list_tbl *ra_list, int ptr_index)
+bool nxpwifi_is_ralist_valid(struct nxpwifi_private *priv,
+			     struct nxpwifi_ra_list_tbl *ra_list, int ptr_index)
 {
 	struct nxpwifi_ra_list_tbl *rlist;
 
@@ -1064,7 +1062,7 @@ void nxpwifi_rotate_priolists(struct nxpwifi_private *priv,
 
 /* This function checks if 11n aggregation is possible.
  */
-static int
+static bool
 nxpwifi_is_11n_aggragation_possible(struct nxpwifi_private *priv,
 				    struct nxpwifi_ra_list_tbl *ptr,
 				    int max_buf_size)
@@ -1151,7 +1149,7 @@ __releases(&priv->wmm.ra_list_spinlock)
 /* This function checks if the first packet in the given RA list
  * is already processed or not.
  */
-static int
+static bool
 nxpwifi_is_ptr_processed(struct nxpwifi_private *priv,
 			 struct nxpwifi_ra_list_tbl *ptr)
 {
@@ -1180,7 +1178,7 @@ nxpwifi_send_processed_packet(struct nxpwifi_private *priv,
 {
 	struct nxpwifi_tx_param tx_param;
 	struct nxpwifi_adapter *adapter = priv->adapter;
-	int ret = -1;
+	int ret;
 	struct sk_buff *skb, *skb_next;
 	struct nxpwifi_txinfo *tx_info;
 
@@ -1232,19 +1230,18 @@ nxpwifi_send_processed_packet(struct nxpwifi_private *priv,
 		tx_info->flags |= NXPWIFI_BUF_FLAG_REQUEUED_PKT;
 		spin_unlock_bh(&priv->wmm.ra_list_spinlock);
 		break;
-	case -1:
-		nxpwifi_dbg(adapter, ERROR, "host_to_card failed: %#x\n", ret);
-		adapter->dbg.num_tx_host_to_card_failure++;
-		nxpwifi_write_data_complete(adapter, skb, 0, ret);
-		break;
 	case -EINPROGRESS:
 		break;
 	case 0:
 		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	default:
+		nxpwifi_dbg(adapter, ERROR, "host_to_card failed: %#x\n", ret);
+		adapter->dbg.num_tx_host_to_card_failure++;
+		nxpwifi_write_data_complete(adapter, skb, 0, ret);
 		break;
 	}
+
 	if (ret != -EBUSY) {
 		nxpwifi_rotate_priolists(priv, ptr, ptr_index);
 		atomic_dec(&priv->wmm.tx_pkts_queued);
@@ -1268,7 +1265,7 @@ nxpwifi_dequeue_tx_packet(struct nxpwifi_adapter *adapter)
 
 	ptr = nxpwifi_wmm_get_highest_priolist_ptr(adapter, &priv, &ptr_index);
 	if (!ptr)
-		return -1;
+		return -ENOENT;
 
 	tid = nxpwifi_get_tid(ptr);
 
@@ -1277,7 +1274,7 @@ nxpwifi_dequeue_tx_packet(struct nxpwifi_adapter *adapter)
 	spin_lock_bh(&priv->wmm.ra_list_spinlock);
 	if (!nxpwifi_is_ralist_valid(priv, ptr, ptr_index)) {
 		spin_unlock_bh(&priv->wmm.ra_list_spinlock);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (nxpwifi_is_ptr_processed(priv, ptr)) {

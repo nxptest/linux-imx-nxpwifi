@@ -254,7 +254,7 @@ int nxpwifi_handle_uap_rx_forward(struct nxpwifi_private *priv,
 				    "failed to copy skb for uAP\n");
 				    priv->stats.rx_dropped++;
 				    dev_kfree_skb_any(skb);
-			return -1;
+			return -ENOMEM;
 		}
 	} else {
 		if (nxpwifi_get_sta_entry(priv, ra)) {
@@ -278,7 +278,7 @@ int nxpwifi_uap_recv_packet(struct nxpwifi_private *priv,
 	struct nxpwifi_txinfo *tx_info;
 
 	if (!skb)
-		return -1;
+		return -ENOMEM;
 
 	p_ethhdr = (void *)skb->data;
 	src_node = nxpwifi_get_sta_entry(priv, p_ethhdr->h_source);

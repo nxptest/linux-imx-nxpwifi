@@ -46,14 +46,14 @@ static int nxpwifi_11n_dispatch_amsdu_pkt(struct nxpwifi_private *priv,
 				ret = nxpwifi_uap_recv_packet(priv, rx_skb);
 			else
 				ret = nxpwifi_recv_packet(priv, rx_skb);
-			if (ret == -1)
+			if (ret)
 				nxpwifi_dbg(priv->adapter, ERROR,
 					    "Rx of A-MSDU failed");
 		}
 		return 0;
 	}
 
-	return -1;
+	return -EINVAL;
 }
 
 /* This function will process the rx packet and forward it to kernel/upper
@@ -270,7 +270,7 @@ nxpwifi_11n_find_last_seq_num(struct reorder_tmr_cnxt *ctx)
 	}
 	spin_unlock_bh(&priv->rx_reorder_tbl_lock);
 
-	return -1;
+	return -EINVAL;
 }
 
 /* This function flushes all the packets in Rx reordering table.
@@ -552,12 +552,12 @@ int nxpwifi_11n_rx_reorder_pkt(struct nxpwifi_private *priv,
 			if (seq_num >= ((start_win + TWOPOW11) &
 					(MAX_TID_VALUE - 1)) &&
 			    seq_num < start_win) {
-				ret = -1;
+				ret = -EINVAL;
 				goto done;
 			}
 		} else if ((seq_num < start_win) ||
 			   (seq_num >= (start_win + TWOPOW11))) {
-			ret = -1;
+			ret = -EINVAL;
 			goto done;
 		}
 	}
@@ -587,7 +587,7 @@ int nxpwifi_11n_rx_reorder_pkt(struct nxpwifi_private *priv,
 			pkt_index = (seq_num + MAX_TID_VALUE) - start_win;
 
 		if (tbl->rx_reorder_ptr[pkt_index]) {
-			ret = -1;
+			ret = -EINVAL;
 			goto done;
 		}
 

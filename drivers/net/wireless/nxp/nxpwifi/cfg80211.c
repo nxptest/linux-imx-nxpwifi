@@ -115,19 +115,21 @@ nxpwifi_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(netdev);
 	static const u8 bc_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	const u8 *peer_mac = pairwise ? mac_addr : bc_mac;
+	int ret;
 
-	if (nxpwifi_set_encode(priv, NULL, NULL, 0, key_index, peer_mac, 1)) {
-		nxpwifi_dbg(priv->adapter, ERROR, "deleting the crypto keys\n");
-		return -EFAULT;
-	}
+	ret = nxpwifi_set_encode(priv, NULL, NULL, 0, key_index, peer_mac, 1);
+	if (ret)
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "crypto keys deleted failed %d\n", ret);
+	else
+		nxpwifi_dbg(priv->adapter, INFO, "info: crypto keys deleted\n");
 
-	nxpwifi_dbg(priv->adapter, INFO, "info: crypto keys deleted\n");
-	return 0;
+	return ret;
 }
 
 /* This function forms an skb for management frame.
  */
-static int
+static void
 nxpwifi_form_mgmt_frame(struct sk_buff *skb, const u8 *buf, size_t len)
 {
 	u8 addr[ETH_ALEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -153,8 +155,6 @@ nxpwifi_form_mgmt_frame(struct sk_buff *skb, const u8 *buf, size_t len)
 
 	skb->priority = LOW_PRIO_TID;
 	__net_timestamp(skb);
-
-	return 0;
 }
 
 /* CFG802.11 operation handler to transmit a management frame.
@@ -173,7 +173,7 @@ nxpwifi_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	if (!buf || !len) {
 		nxpwifi_dbg(priv->adapter, ERROR, "invalid buffer and length\n");
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	mgmt = (const struct ieee80211_mgmt *)buf;
@@ -419,6 +419,7 @@ nxpwifi_cfg80211_set_default_key(struct wiphy *wiphy, struct net_device *netdev,
 				 bool multicast)
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(netdev);
+	int ret = 0;
 
 	/* Return if WEP key not configured */
 	if (!priv->sec_info.wep_enabled)
@@ -426,13 +427,15 @@ nxpwifi_cfg80211_set_default_key(struct wiphy *wiphy, struct net_device *netdev,
 
 	if (priv->bss_type == NXPWIFI_BSS_TYPE_UAP) {
 		priv->wep_key_curr_index = key_index;
-	} else if (nxpwifi_set_encode(priv, NULL, NULL, 0, key_index,
-				      NULL, 0)) {
-		nxpwifi_dbg(priv->adapter, ERROR, "set default Tx key index\n");
-		return -EFAULT;
+	} else {
+		ret = nxpwifi_set_encode(priv, NULL, NULL, 0, key_index,
+					 NULL, 0);
+		if (ret)
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "failed to set default Tx key index\n");
 	}
 
-	return 0;
+	return ret;
 }
 
 /* CFG802.11 operation handler to add a network key.
@@ -446,6 +449,7 @@ nxpwifi_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
 	struct nxpwifi_wep_key *wep_key;
 	static const u8 bc_mac[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 	const u8 *peer_mac = pairwise ? mac_addr : bc_mac;
+	int ret;
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP &&
 	    (params->cipher == WLAN_CIPHER_SUITE_WEP40 ||
@@ -462,13 +466,13 @@ nxpwifi_cfg80211_add_key(struct wiphy *wiphy, struct net_device *netdev,
 		return 0;
 	}
 
-	if (nxpwifi_set_encode(priv, params, params->key, params->key_len,
-			       key_index, peer_mac, 0)) {
-		nxpwifi_dbg(priv->adapter, ERROR, "crypto keys added\n");
-		return -EFAULT;
-	}
+	ret = nxpwifi_set_encode(priv, params, params->key, params->key_len,
+				 key_index, peer_mac, 0);
+	if (ret)
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "failed to add crypto keys\n");
 
-	return 0;
+	return ret;
 }
 
 /* CFG802.11 operation handler to set default mgmt key.
@@ -501,6 +505,7 @@ int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
 	struct nxpwifi_adapter *adapter = nxpwifi_cfg80211_get_adapter(wiphy);
 	struct nxpwifi_private *priv;
 	struct nxpwifi_802_11d_domain_reg *domain_info = &adapter->domain_reg;
+	int ret;
 
 	domain_info->dfs_region = adapter->dfs_region;
 
@@ -513,7 +518,7 @@ int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
 	if (!wiphy->bands[band]) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "11D: setting domain info in FW\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	sband = wiphy->bands[band];
@@ -561,14 +566,14 @@ int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
 
 	priv = nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_ANY);
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_802_11D_DOMAIN_INFO,
-			     HOST_ACT_GEN_SET, 0, NULL, false)) {
-		nxpwifi_dbg(adapter, INFO,
-			    "11D: setting domain info in FW\n");
-		return -1;
-	}
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_802_11D_DOMAIN_INFO,
+			       HOST_ACT_GEN_SET, 0, NULL, false);
 
-	return 0;
+	if (ret)
+		nxpwifi_dbg(adapter, INFO,
+			    "11D: failed to set domain info in FW\n");
+
+	return ret;
 }
 
 static void nxpwifi_reg_apply_radar_flags(struct wiphy *wiphy)
@@ -678,18 +683,20 @@ nxpwifi_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 	struct nxpwifi_adapter *adapter = nxpwifi_cfg80211_get_adapter(wiphy);
 	struct nxpwifi_private *priv;
 	struct nxpwifi_uap_bss_param *bss_cfg;
-	int ret;
+	int ret = 0;
 
 	priv = nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_ANY);
 
 	switch (priv->bss_role) {
 	case NXPWIFI_BSS_ROLE_UAP:
 		if (priv->bss_started)
-			return 0;
+			break;
 
 		bss_cfg = kzalloc(sizeof(*bss_cfg), GFP_KERNEL);
-		if (!bss_cfg)
-			return -ENOMEM;
+		if (!bss_cfg) {
+			ret = -ENOMEM;
+			break;
+		}
 
 		nxpwifi_set_sys_config_invalid_data(bss_cfg);
 
@@ -706,48 +713,46 @@ nxpwifi_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 				       false);
 
 		kfree(bss_cfg);
-		if (ret) {
+		if (ret)
 			nxpwifi_dbg(adapter, ERROR,
 				    "Failed to set wiphy phy params\n");
-			return ret;
-		}
 		break;
 
 	case NXPWIFI_BSS_ROLE_STA:
 		if (priv->media_connected)
-			return 0;
+			break;
 
 		if (changed & WIPHY_PARAM_RTS_THRESHOLD) {
 			ret = nxpwifi_set_rts(priv,
 					      wiphy->rts_threshold);
 			if (ret)
-				return ret;
+				break;
 		}
-		if (changed & WIPHY_PARAM_FRAG_THRESHOLD) {
+		if (changed & WIPHY_PARAM_FRAG_THRESHOLD)
 			ret = nxpwifi_set_frag(priv,
 					       wiphy->frag_threshold);
-			if (ret)
-				return ret;
-		}
 		break;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int nxpwifi_deinit_priv_params(struct nxpwifi_private *priv)
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
 	unsigned long flags;
+	int ret;
 
 	priv->host_mlme_reg = false;
 	priv->mgmt_frame_mask = 0;
-	if (nxpwifi_send_cmd(priv, HOST_CMD_MGMT_FRAME_REG,
-			     HOST_ACT_GEN_SET, 0,
-			     &priv->mgmt_frame_mask, false)) {
+
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_MGMT_FRAME_REG,
+			       HOST_ACT_GEN_SET, 0,
+			       &priv->mgmt_frame_mask, false);
+	if (ret) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "could not unregister mgmt frame rx\n");
-		return -1;
+		return ret;
 	}
 
 	nxpwifi_deauthenticate(priv, NULL);
@@ -775,7 +780,7 @@ static int nxpwifi_deinit_priv_params(struct nxpwifi_private *priv)
 	priv->bss_mode = NL80211_IFTYPE_UNSPECIFIED;
 	priv->sec_info.authentication_mode = NL80211_AUTHTYPE_OPEN_SYSTEM;
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -883,33 +888,38 @@ nxpwifi_change_vif_to_sta(struct net_device *dev,
 {
 	struct nxpwifi_private *priv;
 	struct nxpwifi_adapter *adapter;
+	int ret;
 
 	priv = nxpwifi_netdev_get_priv(dev);
 
 	if (!priv)
-		return -1;
+		return -EINVAL;
 
 	adapter = priv->adapter;
 
 	nxpwifi_dbg(adapter, INFO,
 		    "%s: changing role to station\n", dev->name);
 
-	if (nxpwifi_deinit_priv_params(priv))
-		return -1;
-	if (nxpwifi_init_new_priv_params(priv, dev, type))
-		return -1;
+	ret = nxpwifi_deinit_priv_params(priv);
+	if (ret)
+		goto done;
+	ret = nxpwifi_init_new_priv_params(priv, dev, type);
+	if (ret)
+		goto done;
 
 	update_vif_type_counter(adapter, curr_iftype, -1);
 	update_vif_type_counter(adapter, type, 1);
 	dev->ieee80211_ptr->iftype = type;
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_SET_BSS_MODE,
-			     HOST_ACT_GEN_SET, 0, NULL, true))
-		return -1;
-	if (nxpwifi_sta_init_cmd(priv, false, false))
-		return -1;
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_SET_BSS_MODE,
+			       HOST_ACT_GEN_SET, 0, NULL, true);
+	if (ret)
+		goto done;
 
-	return 0;
+	ret = nxpwifi_sta_init_cmd(priv, false, false);
+
+done:
+	return ret;
 }
 
 static int
@@ -920,33 +930,39 @@ nxpwifi_change_vif_to_ap(struct net_device *dev,
 {
 	struct nxpwifi_private *priv;
 	struct nxpwifi_adapter *adapter;
+	int ret;
 
 	priv = nxpwifi_netdev_get_priv(dev);
 
 	if (!priv)
-		return -1;
+		return -EINVAL;
 
 	adapter = priv->adapter;
 
 	nxpwifi_dbg(adapter, INFO,
 		    "%s: changing role to AP\n", dev->name);
 
-	if (nxpwifi_deinit_priv_params(priv))
-		return -1;
-	if (nxpwifi_init_new_priv_params(priv, dev, type))
-		return -1;
+	ret = nxpwifi_deinit_priv_params(priv);
+	if (ret)
+		goto done;
+
+	ret = nxpwifi_init_new_priv_params(priv, dev, type);
+	if (ret)
+		goto done;
 
 	update_vif_type_counter(adapter, curr_iftype, -1);
 	update_vif_type_counter(adapter, type, 1);
 	dev->ieee80211_ptr->iftype = type;
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_SET_BSS_MODE,
-			     HOST_ACT_GEN_SET, 0, NULL, true))
-		return -1;
-	if (nxpwifi_sta_init_cmd(priv, false, false))
-		return -1;
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_SET_BSS_MODE,
+			       HOST_ACT_GEN_SET, 0, NULL, true);
+	if (ret)
+		goto done;
 
-	return 0;
+	ret = nxpwifi_sta_init_cmd(priv, false, false);
+
+done:
+	return ret;
 }
 
 /* CFG802.11 operation handler to change interface type.
@@ -1118,6 +1134,7 @@ nxpwifi_dump_station_info(struct nxpwifi_private *priv,
 			  struct station_info *sinfo)
 {
 	u32 rate;
+	int ret;
 
 	sinfo->filled = BIT_ULL(NL80211_STA_INFO_RX_BYTES) |
 			BIT_ULL(NL80211_STA_INFO_TX_BYTES) |
@@ -1153,17 +1170,19 @@ nxpwifi_dump_station_info(struct nxpwifi_private *priv,
 	}
 
 	/* Get signal information from the firmware */
-	if (nxpwifi_send_cmd(priv, HOST_CMD_RSSI_INFO,
-			     HOST_ACT_GEN_GET, 0, NULL, true)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_RSSI_INFO,
+			       HOST_ACT_GEN_GET, 0, NULL, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "failed to get signal information\n");
-		return -EFAULT;
+		goto done;
 	}
 
-	if (nxpwifi_drv_get_data_rate(priv, &rate)) {
+	ret = nxpwifi_drv_get_data_rate(priv, &rate);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "getting data rate error\n");
-		return -EFAULT;
+		goto done;
 	}
 
 	/* Get DTIM period information from firmware */
@@ -1203,7 +1222,8 @@ nxpwifi_dump_station_info(struct nxpwifi_private *priv,
 			priv->curr_bss_params.bss_descriptor.beacon_period;
 	}
 
-	return 0;
+done:
+	return ret;
 }
 
 /* CFG802.11 operation handler to get station information.
@@ -1483,6 +1503,7 @@ static int nxpwifi_cfg80211_set_cqm_rssi_config(struct wiphy *wiphy,
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	struct nxpwifi_ds_misc_subsc_evt subsc_evt;
+	int ret = 0;
 
 	priv->cqm_rssi_thold = rssi_thold;
 	priv->cqm_rssi_hyst = rssi_hyst;
@@ -1497,17 +1518,17 @@ static int nxpwifi_cfg80211_set_cqm_rssi_config(struct wiphy *wiphy,
 		subsc_evt.bcn_h_rssi_cfg.abs_value = abs(rssi_thold);
 		subsc_evt.bcn_l_rssi_cfg.evt_freq = 1;
 		subsc_evt.bcn_h_rssi_cfg.evt_freq = 1;
-		return nxpwifi_send_cmd(priv,
-					HOST_CMD_802_11_SUBSCRIBE_EVENT,
-					0, 0, &subsc_evt, true);
+		ret = nxpwifi_send_cmd(priv,
+				       HOST_CMD_802_11_SUBSCRIBE_EVENT,
+				       0, 0, &subsc_evt, true);
 	} else {
 		subsc_evt.action = HOST_ACT_BITWISE_CLR;
-		return nxpwifi_send_cmd(priv,
-					HOST_CMD_802_11_SUBSCRIBE_EVENT,
-					0, 0, &subsc_evt, true);
+		ret = nxpwifi_send_cmd(priv,
+				       HOST_CMD_802_11_SUBSCRIBE_EVENT,
+				       0, 0, &subsc_evt, true);
 	}
 
-	return 0;
+	return ret;
 }
 
 /* cfg80211 operation handler for change_beacon.
@@ -1519,6 +1540,7 @@ int nxpwifi_cfg80211_change_beacon(struct wiphy *wiphy,
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	struct nxpwifi_adapter *adapter = priv->adapter;
+	int ret;
 
 	nxpwifi_cancel_scan(adapter);
 
@@ -1528,13 +1550,12 @@ int nxpwifi_cfg80211_change_beacon(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (nxpwifi_set_mgmt_ies(priv, data)) {
+	ret = nxpwifi_set_mgmt_ies(priv, data);
+	if (ret)
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "%s: setting mgmt ies failed\n", __func__);
-		return -EFAULT;
-	}
 
-	return 0;
+	return ret;
 }
 
 /* cfg80211 operation handler for del_station.
@@ -1550,6 +1571,7 @@ nxpwifi_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	struct nxpwifi_sta_node *sta_node;
 	u8 deauth_mac[ETH_ALEN];
+	int ret = 0;
 
 	if (!priv->bss_started && priv->wdev.cac_started) {
 		nxpwifi_dbg(priv->adapter, INFO, "%s: abort CAC!\n", __func__);
@@ -1573,14 +1595,12 @@ nxpwifi_cfg80211_del_station(struct wiphy *wiphy, struct net_device *dev,
 		ether_addr_copy(deauth_mac, params->mac);
 	spin_unlock_bh(&priv->sta_list_spinlock);
 
-	if (is_valid_ether_addr(deauth_mac)) {
-		if (nxpwifi_send_cmd(priv, HOST_CMD_UAP_STA_DEAUTH,
-				     HOST_ACT_GEN_SET, 0,
-				     deauth_mac, true))
-			return -1;
-	}
+	if (is_valid_ether_addr(deauth_mac))
+		ret = nxpwifi_send_cmd(priv, HOST_CMD_UAP_STA_DEAUTH,
+				       HOST_ACT_GEN_SET, 0,
+				       deauth_mac, true);
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -1652,13 +1672,17 @@ nxpwifi_cfg80211_get_antenna(struct wiphy *wiphy, u32 *tx_ant, u32 *rx_ant)
 	struct nxpwifi_adapter *adapter = nxpwifi_cfg80211_get_adapter(wiphy);
 	struct nxpwifi_private *priv = nxpwifi_get_priv(adapter,
 							NXPWIFI_BSS_ROLE_ANY);
-	nxpwifi_send_cmd(priv, HOST_CMD_RF_ANTENNA,
-			 HOST_ACT_GEN_GET, 0, NULL, true);
+	int ret;
 
-	*tx_ant = priv->tx_ant;
-	*rx_ant = priv->rx_ant;
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_RF_ANTENNA,
+			       HOST_ACT_GEN_GET, 0, NULL, true);
 
-	return 0;
+	if (!ret) {
+		*tx_ant = priv->tx_ant;
+		*rx_ant = priv->rx_ant;
+	}
+
+	return ret;
 }
 
 /* cfg80211 operation handler for stop ap.
@@ -1668,6 +1692,7 @@ static int nxpwifi_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 				    unsigned int link_id)
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
+	int ret;
 
 	nxpwifi_abort_cac(priv);
 
@@ -1678,25 +1703,28 @@ static int nxpwifi_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 	priv->ap_11n_enabled = 0;
 	memset(&priv->bss_cfg, 0, sizeof(priv->bss_cfg));
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_STOP,
-			     HOST_ACT_GEN_SET, 0, NULL, true)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_UAP_BSS_STOP,
+			       HOST_ACT_GEN_SET, 0, NULL, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to stop the BSS\n");
-		return -1;
+		goto done;
 	}
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_APCMD_SYS_RESET,
-			     HOST_ACT_GEN_SET, 0, NULL, true)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_APCMD_SYS_RESET,
+			       HOST_ACT_GEN_SET, 0, NULL, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to reset BSS\n");
-		return -1;
+		goto done;
 	}
 
 	if (netif_carrier_ok(priv->netdev))
 		netif_carrier_off(priv->netdev);
 	nxpwifi_stop_net_dev_queue(priv->netdev, priv->adapter);
 
-	return 0;
+done:
+	return ret;
 }
 
 /* cfg80211 operation handler for start_ap.
@@ -1716,9 +1744,10 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 	struct nxpwifi_current_bss_params *bss_params;
 	enum nl80211_band band;
 	int freq;
+	int ret;
 
 	if (GET_BSS_ROLE(priv) != NXPWIFI_BSS_ROLE_UAP)
-		return -1;
+		return -EINVAL;
 
 	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
 		tmp_priv = adapter->priv[i];
@@ -1782,10 +1811,11 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 	nxpwifi_uap_set_channel(priv, bss_cfg, params->chandef);
 	nxpwifi_set_uap_rates(bss_cfg, params);
 
-	if (nxpwifi_set_secure_params(priv, bss_cfg, params)) {
+	ret = nxpwifi_set_secure_params(priv, bss_cfg, params);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to parse security parameters!\n");
-		goto out;
+		goto done;
 	}
 
 	nxpwifi_set_ht_params(priv, bss_cfg, params);
@@ -1811,36 +1841,37 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 					   priv->bss_mode)) {
 		nxpwifi_dbg(priv->adapter, INFO,
 			    "Disable 11h extensions in FW\n");
-		if (nxpwifi_11h_activate(priv, false)) {
+		ret = nxpwifi_11h_activate(priv, false);
+		if (ret) {
 			nxpwifi_dbg(priv->adapter, ERROR,
 				    "Failed to disable 11h extensions!!");
-			goto out;
+			goto done;
 		}
 		priv->state_11h.is_11h_active = false;
 	}
 
 	nxpwifi_config_uap_11d(priv, &params->beacon);
 
-	if (nxpwifi_config_start_uap(priv, bss_cfg)) {
+	ret = nxpwifi_config_start_uap(priv, bss_cfg);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to start AP\n");
-		goto out;
+		goto done;
 	}
 
-	if (nxpwifi_set_mgmt_ies(priv, &params->beacon))
-		goto out;
+	ret = nxpwifi_set_mgmt_ies(priv, &params->beacon);
+	if (ret)
+		goto done;
 
 	if (!netif_carrier_ok(priv->netdev))
 		netif_carrier_on(priv->netdev);
 	nxpwifi_wake_up_net_dev_queue(priv->netdev, priv->adapter);
 
 	memcpy(&priv->bss_cfg, bss_cfg, sizeof(priv->bss_cfg));
-	kfree(bss_cfg);
-	return 0;
 
-out:
+done:
 	kfree(bss_cfg);
-	return -1;
+	return ret;
 }
 
 /* CFG802.11 operation handler for scan request.
@@ -1970,6 +2001,7 @@ nxpwifi_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	struct ieee80211_channel *chan;
 	struct nxpwifi_bg_scan_cfg *bgscan_cfg;
 	struct ieee_types_header *ie;
+	int ret;
 
 	if (!request || (!request->n_ssids && !request->n_match_sets)) {
 		wiphy_err(wiphy, "%s : Invalid Sched_scan parameters",
@@ -2044,16 +2076,14 @@ nxpwifi_cfg80211_sched_scan_start(struct wiphy *wiphy,
 		bgscan_cfg->rssi_threshold = request->min_rssi_thold;
 	}
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_802_11_BG_SCAN_CONFIG,
-			     HOST_ACT_GEN_SET, 0, bgscan_cfg, true)) {
-		kfree(bgscan_cfg);
-		return -EFAULT;
-	}
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_802_11_BG_SCAN_CONFIG,
+			       HOST_ACT_GEN_SET, 0, bgscan_cfg, true);
 
-	priv->sched_scanning = true;
+	if (!ret)
+		priv->sched_scanning = true;
 
 	kfree(bgscan_cfg);
-	return 0;
+	return ret;
 }
 
 /* CFG802.11 operation handler for sched_scan_stop.
@@ -2067,9 +2097,7 @@ static int nxpwifi_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 
 	wiphy_info(wiphy, "sched scan stop!");
-	nxpwifi_stop_bg_scan(priv);
-
-	return 0;
+	return nxpwifi_stop_bg_scan(priv);
 }
 
 static void nxpwifi_setup_vht_caps(struct ieee80211_sta_vht_cap *vht_info,
@@ -2623,7 +2651,7 @@ static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 		ret = nxpwifi_set_wowlan_mef_entry(priv, &mef_cfg,
 						   &mef_entry[1], wowlan);
 		if (ret)
-			goto err;
+			goto done;
 	}
 
 	if (!mef_cfg.criteria)
@@ -2634,7 +2662,7 @@ static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 	ret = nxpwifi_send_cmd(priv, HOST_CMD_MEF_CFG, HOST_ACT_GEN_SET, 0,
 			       &mef_cfg, true);
 
-err:
+done:
 	kfree(mef_entry);
 	return ret;
 }
@@ -2963,6 +2991,7 @@ nxpwifi_cfg80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	int chsw_msec;
+	int ret;
 
 	if (priv->adapter->scan_processing) {
 		nxpwifi_dbg(priv->adapter, ERROR,
@@ -2984,14 +3013,16 @@ nxpwifi_cfg80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 		priv->uap_stop_tx = true;
 	}
 
-	if (nxpwifi_del_mgmt_ies(priv))
+	ret = nxpwifi_del_mgmt_ies(priv);
+	if (ret)
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Failed to delete mgmt IEs!\n");
 
-	if (nxpwifi_set_mgmt_ies(priv, &params->beacon_csa)) {
+	ret = nxpwifi_set_mgmt_ies(priv, &params->beacon_csa);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "%s: setting mgmt ies failed\n", __func__);
-		return -EFAULT;
+		goto done;
 	}
 
 	memcpy(&priv->dfs_chandef, &params->chandef, sizeof(priv->dfs_chandef));
@@ -3001,7 +3032,9 @@ nxpwifi_cfg80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	chsw_msec = max(params->count * priv->bss_cfg.beacon_period, 100);
 	queue_delayed_work(priv->dfs_chan_sw_workqueue, &priv->dfs_chan_sw_work,
 			   msecs_to_jiffies(chsw_msec));
-	return 0;
+
+done:
+	return ret;
 }
 
 static int nxpwifi_cfg80211_get_channel(struct wiphy *wiphy,
@@ -3132,6 +3165,7 @@ nxpwifi_cfg80211_start_radar_detection(struct wiphy *wiphy,
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	struct nxpwifi_radar_params radar_params;
+	int ret;
 
 	if (priv->adapter->scan_processing) {
 		nxpwifi_dbg(priv->adapter, ERROR,
@@ -3145,7 +3179,7 @@ nxpwifi_cfg80211_start_radar_detection(struct wiphy *wiphy,
 		if (nxpwifi_11h_activate(priv, true)) {
 			nxpwifi_dbg(priv->adapter, ERROR,
 				    "Failed to activate 11h extensions!!");
-			return -1;
+			return -EPERM;
 		}
 		priv->state_11h.is_11h_active = true;
 	}
@@ -3156,13 +3190,14 @@ nxpwifi_cfg80211_start_radar_detection(struct wiphy *wiphy,
 
 	memcpy(&priv->dfs_chandef, chandef, sizeof(priv->dfs_chandef));
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_CHAN_REPORT_REQUEST,
-			     HOST_ACT_GEN_SET, 0, &radar_params, true))
-		return -1;
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_CHAN_REPORT_REQUEST,
+			       HOST_ACT_GEN_SET, 0, &radar_params, true);
+	if (!ret)
+		queue_delayed_work(priv->dfs_cac_workqueue,
+				   &priv->dfs_cac_work,
+				   msecs_to_jiffies(cac_time_ms));
 
-	queue_delayed_work(priv->dfs_cac_workqueue, &priv->dfs_cac_work,
-			   msecs_to_jiffies(cac_time_ms));
-	return 0;
+	return ret;
 }
 
 static int
@@ -3193,7 +3228,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP) {
 		nxpwifi_dbg(adapter, ERROR, "Interface role is AP\n");
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	if (priv->wdev.iftype != NL80211_IFTYPE_STATION) {
@@ -3265,7 +3300,7 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 				nxpwifi_roc_cookie(adapter);
 			priv->roc_cfg.chan = *req->bss->channel;
 		} else {
-			return -EFAULT;
+			return -EPERM;
 		}
 	}
 
@@ -3369,7 +3404,7 @@ nxpwifi_cfg80211_associate(struct wiphy *wiphy, struct net_device *dev,
 			    "%s: Ignore association.\t"
 			    "Card removed or FW in bad state\n",
 			    dev->name);
-		return -EFAULT;
+		return -EPERM;
 	}
 
 	if (priv->auth_alg == WLAN_AUTH_SAE)
@@ -3385,7 +3420,7 @@ nxpwifi_cfg80211_associate(struct wiphy *wiphy, struct net_device *dev,
 			memset(&priv->roc_cfg, 0,
 			       sizeof(struct nxpwifi_roc_cfg));
 		else
-			return -EFAULT;
+			return ret;
 	}
 
 	if (!nxpwifi_stop_bg_scan(priv))
@@ -3444,23 +3479,23 @@ nxpwifi_cfg80211_associate(struct wiphy *wiphy, struct net_device *dev,
 		priv->auth_flag = 0;
 		priv->auth_alg = WLAN_AUTH_NONE;
 		eth_zero_addr(priv->cfg_bssid);
-	}
-
-	if (priv->assoc_rsp_size) {
-		priv->req_bss = req->bss;
-		adapter->assoc_resp_received = true;
-		queue_work(adapter->host_mlme_workqueue,
-			   &adapter->host_mlme_work);
+	} else {
+		if (priv->assoc_rsp_size) {
+			priv->req_bss = req->bss;
+			adapter->assoc_resp_received = true;
+			queue_work(adapter->host_mlme_workqueue,
+				   &adapter->host_mlme_work);
+		}
 	}
 
 	cfg80211_put_bss(priv->adapter->wiphy, req->bss);
 
-	return 0;
+	return ret;
 
 ssid_err:
 
 	rcu_read_unlock();
-	return -EFAULT;
+	return -EINVAL;
 }
 
 static int
@@ -3468,17 +3503,18 @@ nxpwifi_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 			    u16 reason_code)
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
+	int ret;
 
 	if (!nxpwifi_stop_bg_scan(priv))
 		cfg80211_sched_scan_stopped_locked(priv->wdev.wiphy, 0);
 
-	if (nxpwifi_deauthenticate(priv, NULL))
-		return -EFAULT;
+	ret = nxpwifi_deauthenticate(priv, NULL);
+	if (!ret) {
+		eth_zero_addr(priv->cfg_bssid);
+		priv->hs2_enabled = false;
+	}
 
-	eth_zero_addr(priv->cfg_bssid);
-	priv->hs2_enabled = false;
-
-	return 0;
+	return ret;
 }
 
 static int
@@ -3502,6 +3538,10 @@ nxpwifi_cfg80211_probe_client(struct wiphy *wiphy,
 			      struct net_device *dev, const u8 *peer,
 			      u64 *cookie)
 {
+	/* hostapd looks for NL80211_CMD_PROBE_CLIENT support; otherwise,
+	 * it requires monitor-mode support (which mwifiex doesn't support).
+	 * Provide fake probe_client support to work around this.
+	 */
 	return -EOPNOTSUPP;
 }
 

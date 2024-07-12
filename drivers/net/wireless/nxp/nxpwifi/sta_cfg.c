@@ -191,6 +191,7 @@ static int nxpwifi_process_country_ie(struct nxpwifi_private *priv,
 	u8 country_ie_len;
 	struct nxpwifi_802_11d_domain_reg *domain_info =
 					&priv->adapter->domain_reg;
+	int ret;
 
 	rcu_read_lock();
 	country_ie = ieee80211_bss_get_ie(bss, WLAN_EID_COUNTRY);
@@ -236,16 +237,15 @@ static int nxpwifi_process_country_ie(struct nxpwifi_private *priv,
 
 	rcu_read_unlock();
 
-	if (nxpwifi_send_cmd(priv, HOST_CMD_802_11D_DOMAIN_INFO,
-			     HOST_ACT_GEN_SET, 0, NULL, false)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_802_11D_DOMAIN_INFO,
+			       HOST_ACT_GEN_SET, 0, NULL, false);
+	if (ret)
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "11D: setting domain info in FW fail\n");
-		return -1;
-	}
+	else
+		nxpwifi_dnld_txpwr_table(priv);
 
-	nxpwifi_dnld_txpwr_table(priv);
-
-	return 0;
+	return ret;
 }
 
 /* In infra mode, an deauthentication is performed
@@ -294,7 +294,7 @@ int nxpwifi_bss_start(struct nxpwifi_private *priv, struct cfg80211_bss *bss,
 		nxpwifi_dbg(adapter, ERROR,
 			    "Attempt to reconnect on csa closed chan(%d)\n",
 			    bss_desc->channel);
-		ret = -1;
+		ret = -EINVAL;
 		goto done;
 	}
 
@@ -355,7 +355,7 @@ int nxpwifi_set_hs_params(struct nxpwifi_private *priv, u16 action,
 			nxpwifi_dbg(adapter, INFO,
 				    "info: Host Sleep IOCTL\t"
 				    "is blocked in UAPSD/PPS mode\n");
-			status = -1;
+			status = -EPERM;
 			break;
 		}
 		if (hs_cfg->is_invoke_hostcmd) {
@@ -380,7 +380,7 @@ int nxpwifi_set_hs_params(struct nxpwifi_private *priv, u16 action,
 				/* Return failure if no parameters for HS
 				 * enable
 				 */
-				status = -1;
+				status = -EINVAL;
 				break;
 			}
 
@@ -407,7 +407,7 @@ int nxpwifi_set_hs_params(struct nxpwifi_private *priv, u16 action,
 		hs_cfg->gap = adapter->hs_cfg.gap;
 		break;
 	default:
-		status = -1;
+		status = -EINVAL;
 		break;
 	}
 
@@ -436,7 +436,7 @@ EXPORT_SYMBOL_GPL(nxpwifi_cancel_hs);
  * This function allocates the IOCTL request buffer, fills it
  * with requisite parameters and calls the IOCTL handler.
  */
-int nxpwifi_enable_hs(struct nxpwifi_adapter *adapter)
+bool nxpwifi_enable_hs(struct nxpwifi_adapter *adapter)
 {
 	struct nxpwifi_ds_hs_cfg hscfg;
 	struct nxpwifi_private *priv;
@@ -512,7 +512,7 @@ int nxpwifi_get_bss_info(struct nxpwifi_private *priv,
 	struct nxpwifi_bssdescriptor *bss_desc;
 
 	if (!info)
-		return -1;
+		return -EINVAL;
 
 	bss_desc = &priv->curr_bss_params.bss_descriptor;
 
@@ -612,7 +612,7 @@ int nxpwifi_set_tx_power(struct nxpwifi_private *priv,
 				    "is out of range (%d dBm-%d dBm)\n",
 				    dbm, priv->min_tx_power_level,
 				    priv->max_tx_power_level);
-			return -1;
+			return -EINVAL;
 		}
 	}
 	buf = kzalloc(NXPWIFI_SIZE_OF_CMD_BUFFER, GFP_KERNEL);
@@ -713,7 +713,7 @@ static int nxpwifi_set_wpa_ie(struct nxpwifi_private *priv,
 		if (ie_len > sizeof(priv->wpa_ie)) {
 			nxpwifi_dbg(priv->adapter, ERROR,
 				    "failed to copy WPA IE, too big\n");
-			return -1;
+			return -EINVAL;
 		}
 		memcpy(priv->wpa_ie, ie_data_ptr, ie_len);
 		priv->wpa_ie_len = ie_len;
@@ -755,7 +755,7 @@ static int nxpwifi_set_wps_ie(struct nxpwifi_private *priv,
 		if (ie_len > NXPWIFI_MAX_VSIE_LEN) {
 			nxpwifi_dbg(priv->adapter, ERROR,
 				    "info: failed to copy WPS IE, too big\n");
-			return -1;
+			return -EINVAL;
 		}
 
 		priv->wps_ie = kzalloc(NXPWIFI_MAX_VSIE_LEN, GFP_KERNEL);
@@ -802,7 +802,7 @@ nxpwifi_sec_ioctl_set_wep_key(struct nxpwifi_private *priv,
 		if (!wep_key->key_length) {
 			nxpwifi_dbg(adapter, ERROR,
 				    "key not set, so cannot enable it\n");
-			return -1;
+			return -EINVAL;
 		}
 
 		memcpy(encrypt_key->key_material,
@@ -873,7 +873,7 @@ nxpwifi_sec_ioctl_set_wpa_key(struct nxpwifi_private *priv,
 	if (encrypt_key->key_len > WLAN_MAX_KEY_LEN) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "key length too long\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	if (!encrypt_key->key_index)
@@ -983,11 +983,9 @@ nxpwifi_get_ver_ext(struct nxpwifi_private *priv, u32 version_str_sel)
 
 	memset(&ver_ext, 0, sizeof(ver_ext));
 	ver_ext.version_str_sel = version_str_sel;
-	if (nxpwifi_send_cmd(priv, HOST_CMD_VERSION_EXT,
-			     HOST_ACT_GEN_GET, 0, &ver_ext, true))
-		return -1;
 
-	return 0;
+	return nxpwifi_send_cmd(priv, HOST_CMD_VERSION_EXT,
+				HOST_ACT_GEN_GET, 0, &ver_ext, true);
 }
 
 int
@@ -997,6 +995,7 @@ nxpwifi_remain_on_chan_cfg(struct nxpwifi_private *priv, u16 action,
 {
 	struct host_cmd_ds_remain_on_chan roc_cfg;
 	u8 sc;
+	int ret;
 
 	memset(&roc_cfg, 0, sizeof(roc_cfg));
 	roc_cfg.action = cpu_to_le16(action);
@@ -1009,11 +1008,12 @@ nxpwifi_remain_on_chan_cfg(struct nxpwifi_private *priv, u16 action,
 			ieee80211_frequency_to_channel(chan->center_freq);
 		roc_cfg.duration = cpu_to_le32(duration);
 	}
-	if (nxpwifi_send_cmd(priv, HOST_CMD_REMAIN_ON_CHAN,
-			     action, 0, &roc_cfg, true)) {
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_REMAIN_ON_CHAN,
+			       action, 0, &roc_cfg, true);
+	if (ret) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "failed to remain on channel\n");
-		return -1;
+		return ret;
 	}
 
 	return roc_cfg.status;
@@ -1067,7 +1067,7 @@ static int nxpwifi_reg_mem_ioctl_reg_rw(struct nxpwifi_private *priv,
 		cmd_no = HOST_CMD_CAU_REG_ACCESS;
 		break;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
 	return nxpwifi_send_cmd(priv, cmd_no, action, 0, reg_rw, true);
@@ -1107,12 +1107,9 @@ nxpwifi_reg_read(struct nxpwifi_private *priv, u32 reg_type,
 	reg_rw.offset = reg_offset;
 	ret = nxpwifi_reg_mem_ioctl_reg_rw(priv, &reg_rw, HOST_ACT_GEN_GET);
 
-	if (ret)
-		goto done;
+	if (!ret)
+		*value = reg_rw.value;
 
-	*value = reg_rw.value;
-
-done:
 	return ret;
 }
 
@@ -1160,7 +1157,7 @@ nxpwifi_set_gen_ie_helper(struct nxpwifi_private *priv, u8 *ie_data_ptr,
 		return 0;
 	} else if (!ie_data_ptr ||
 		   ie_len <= sizeof(struct ieee_types_header)) {
-		return -1;
+		return -EINVAL;
 	}
 	pvendor_ie = (struct ieee_types_vendor_header *)ie_data_ptr;
 
@@ -1258,14 +1255,14 @@ static int nxpwifi_misc_ioctl_gen_ie(struct nxpwifi_private *priv,
 			adapter->arp_filter_size = 0;
 			nxpwifi_dbg(adapter, ERROR,
 				    "invalid ARP filter size\n");
-			return -1;
+			return -EINVAL;
 		}
 		memcpy(adapter->arp_filter, gen_ie->ie_data, gen_ie->len);
 		adapter->arp_filter_size = gen_ie->len;
 		break;
 	default:
 		nxpwifi_dbg(adapter, ERROR, "invalid IE type\n");
-		return -1;
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -1286,10 +1283,8 @@ nxpwifi_set_gen_ie(struct nxpwifi_private *priv, const u8 *ie, int ie_len)
 	gen_ie.type = NXPWIFI_IE_TYPE_GEN_IE;
 	gen_ie.len = ie_len;
 	memcpy(gen_ie.ie_data, ie, ie_len);
-	if (nxpwifi_misc_ioctl_gen_ie(priv, &gen_ie, HOST_ACT_GEN_SET))
-		return -EFAULT;
 
-	return 0;
+	return nxpwifi_misc_ioctl_gen_ie(priv, &gen_ie, HOST_ACT_GEN_SET);
 }
 
 /* This function get Host Sleep wake up reason.
@@ -1298,23 +1293,15 @@ int nxpwifi_get_wakeup_reason(struct nxpwifi_private *priv, u16 action,
 			      int cmd_type,
 			      struct nxpwifi_ds_wakeup_reason *wakeup_reason)
 {
-	int status = 0;
-
-	status = nxpwifi_send_cmd(priv, HOST_CMD_HS_WAKEUP_REASON,
-				  HOST_ACT_GEN_GET, 0, wakeup_reason,
-				  cmd_type == NXPWIFI_SYNC_CMD);
-
-	return status;
+	return nxpwifi_send_cmd(priv, HOST_CMD_HS_WAKEUP_REASON,
+				HOST_ACT_GEN_GET, 0, wakeup_reason,
+				cmd_type == NXPWIFI_SYNC_CMD);
 }
 
 int nxpwifi_get_chan_info(struct nxpwifi_private *priv,
 			  struct nxpwifi_channel_band *channel_band)
 {
-	int status = 0;
-
-	status = nxpwifi_send_cmd(priv, HOST_CMD_STA_CONFIGURE,
-				  HOST_ACT_GEN_GET, 0, channel_band,
-				  NXPWIFI_SYNC_CMD);
-
-	return status;
+	return nxpwifi_send_cmd(priv, HOST_CMD_STA_CONFIGURE,
+				HOST_ACT_GEN_GET, 0, channel_band,
+				NXPWIFI_SYNC_CMD);
 }

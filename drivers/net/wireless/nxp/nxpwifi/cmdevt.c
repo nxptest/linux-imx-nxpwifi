@@ -170,7 +170,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 	u16 cmd_size;
 
 	if (!adapter || !cmd_node)
-		return -1;
+		return -EINVAL;
 
 	host_cmd = (struct host_cmd_ds_command *)(cmd_node->cmd_skb->data);
 
@@ -182,7 +182,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 		if (cmd_node->wait_q_enabled)
 			adapter->cmd_wait_q.status = -1;
 		nxpwifi_recycle_cmd_node(adapter, cmd_node);
-		return -1;
+		return -EINVAL;
 	}
 
 	cmd_code = le16_to_cpu(host_cmd->command);
@@ -197,7 +197,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 			cmd_code);
 		nxpwifi_recycle_cmd_node(adapter, cmd_node);
 		queue_work(adapter->workqueue, &adapter->main_work);
-		return -1;
+		return -EPERM;
 	}
 
 	/* Set command sequence number */
@@ -236,7 +236,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 					   cmd_node->cmd_skb, NULL);
 	skb_pull(cmd_node->cmd_skb, adapter->intf_hdr_len);
 
-	if (ret == -1) {
+	if (ret) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "DNLD_CMD: host to card failed\n");
 		if (cmd_node->wait_q_enabled)
@@ -248,7 +248,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 		spin_unlock_bh(&adapter->nxpwifi_cmd_lock);
 
 		adapter->dbg.num_cmd_host_to_card_failure++;
-		return -1;
+		return ret;
 	}
 
 	/* Save the last command id and action to debug log */
@@ -309,10 +309,10 @@ static int nxpwifi_dnld_sleep_confirm_cmd(struct nxpwifi_adapter *adapter)
 					   adapter->sleep_cfm, NULL);
 	skb_pull(adapter->sleep_cfm, adapter->intf_hdr_len);
 
-	if (ret == -1) {
+	if (ret) {
 		nxpwifi_dbg(adapter, ERROR, "SLEEP_CFM: failed\n");
 		adapter->dbg.num_cmd_sleep_cfm_host_to_card_failure++;
-		return -1;
+		return ret;
 	}
 
 	if (!le16_to_cpu(sleep_cfm_buf->resp_ctrl))
@@ -499,39 +499,39 @@ int nxpwifi_send_cmd(struct nxpwifi_private *priv, u16 cmd_no,
 
 	if (!adapter) {
 		pr_err("PREP_CMD: adapter is NULL\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	if (test_bit(NXPWIFI_IS_SUSPENDED, &adapter->work_flags)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: device in suspended state\n");
-		return -1;
+		return -EPERM;
 	}
 
 	if (test_bit(NXPWIFI_IS_HS_ENABLING, &adapter->work_flags) &&
 	    cmd_no != HOST_CMD_802_11_HS_CFG_ENH) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: host entering sleep state\n");
-		return -1;
+		return -EPERM;
 	}
 
 	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: card is removed\n");
-		return -1;
+		return -EPERM;
 	}
 
 	if (test_bit(NXPWIFI_IS_CMD_TIMEDOUT, &adapter->work_flags)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: FW is in bad state\n");
-		return -1;
+		return -EPERM;
 	}
 
 	if (adapter->hw_status == NXPWIFI_HW_STATUS_RESET) {
 		if (cmd_no != HOST_CMD_FUNC_INIT) {
 			nxpwifi_dbg(adapter, ERROR,
 				    "PREP_CMD: FW in reset state\n");
-			return -1;
+			return -EPERM;
 		}
 	}
 
@@ -547,7 +547,7 @@ int nxpwifi_send_cmd(struct nxpwifi_private *priv, u16 cmd_no,
 	if (!cmd_node) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: no free cmd node\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	/* Initialize the command node */
@@ -556,7 +556,7 @@ int nxpwifi_send_cmd(struct nxpwifi_private *priv, u16 cmd_no,
 	if (!cmd_node->cmd_skb) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "PREP_CMD: no free cmd buf\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	skb_put_zero(cmd_node->cmd_skb, sizeof(struct host_cmd_ds_command));
@@ -591,7 +591,7 @@ int nxpwifi_send_cmd(struct nxpwifi_private *priv, u16 cmd_no,
 			    "PREP_CMD: cmd %#x preparation failed\n",
 			    cmd_no);
 		nxpwifi_insert_cmd_to_free_q(adapter, cmd_node);
-		return -1;
+		return ret;
 	}
 
 	/* Send command */
@@ -684,7 +684,7 @@ int nxpwifi_exec_next_cmd(struct nxpwifi_adapter *adapter)
 	if (adapter->curr_cmd) {
 		nxpwifi_dbg(adapter, FATAL,
 			    "EXEC_NEXT_CMD: cmd in processing\n");
-		return -1;
+		return -EBUSY;
 	}
 
 	spin_lock_bh(&adapter->nxpwifi_cmd_lock);
@@ -797,7 +797,7 @@ int nxpwifi_process_cmdresp(struct nxpwifi_adapter *adapter)
 		nxpwifi_dbg(adapter, ERROR,
 			    "CMD_RESP: NULL curr_cmd, %#x\n",
 			    le16_to_cpu(resp->command));
-		return -1;
+		return -EINVAL;
 	}
 
 	resp = (struct host_cmd_ds_command *)adapter->curr_cmd->resp_skb->data;
@@ -808,7 +808,7 @@ int nxpwifi_process_cmdresp(struct nxpwifi_adapter *adapter)
 		nxpwifi_dbg(adapter, ERROR,
 			    "cmdresp error: cmd=0x%x cmd_resp=0x%x\n",
 			    adapter->curr_cmd->cmd_no, cmdresp_no);
-		return -1;
+		return -EINVAL;
 	}
 	/* Now we got response from FW, cancel the command timer */
 	del_timer_sync(&adapter->cmd_timer);
@@ -863,7 +863,7 @@ int nxpwifi_process_cmdresp(struct nxpwifi_adapter *adapter)
 		spin_lock_bh(&adapter->nxpwifi_cmd_lock);
 		adapter->curr_cmd = NULL;
 		spin_unlock_bh(&adapter->nxpwifi_cmd_lock);
-		return -1;
+		return -EINVAL;
 	}
 
 	if (adapter->curr_cmd->cmd_flag & CMD_F_HOSTCMD) {
@@ -874,7 +874,7 @@ int nxpwifi_process_cmdresp(struct nxpwifi_adapter *adapter)
 	} else {
 		if (resp->result != HOST_RESULT_OK) {
 			nxpwifi_process_cmdresp_error(priv, resp);
-			return -1;
+			return -EFAULT;
 		}
 		if (adapter->curr_cmd->cmd_resp) {
 			void *data_buf = adapter->curr_cmd->data_buf;
@@ -892,7 +892,7 @@ int nxpwifi_process_cmdresp(struct nxpwifi_adapter *adapter)
 				    "%s: cmd %#x failed during\t"
 				    "initialization\n", __func__, cmdresp_no);
 			nxpwifi_init_fw_complete(adapter);
-			return -1;
+			return ret;
 		} else if (adapter->last_init_cmd == cmdresp_no) {
 			adapter->hw_status = NXPWIFI_HW_STATUS_INIT_DONE;
 		}

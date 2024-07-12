@@ -309,7 +309,7 @@ int nxpwifi_11h_handle_chanrpt_ready(struct nxpwifi_private *priv,
 	if (le32_to_cpu(rpt_event->result) != HOST_RESULT_OK) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Error in channel report event\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	while (event_len >= sizeof(struct nxpwifi_ie_types_header)) {

@@ -487,7 +487,7 @@ static int nxpwifi_cmd_sta_reg_access(struct nxpwifi_private *priv,
 		break;
 	}
 	default:
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -548,7 +548,7 @@ nxpwifi_ret_sta_reg_access(struct nxpwifi_private *priv,
 		if (eeprom->byte_count < le16_to_cpu(r.eeprom->byte_count)) {
 			eeprom->byte_count = 0;
 			pr_debug("info: EEPROM read length is too big\n");
-			return -1;
+			return -ENOMEM;
 		}
 		eeprom->offset = le16_to_cpu(r.eeprom->offset);
 		eeprom->byte_count = le16_to_cpu(r.eeprom->byte_count);
@@ -557,7 +557,7 @@ nxpwifi_ret_sta_reg_access(struct nxpwifi_private *priv,
 			       min((u16)MAX_EEPROM_DATA, eeprom->byte_count));
 		break;
 	default:
-		return -1;
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -737,7 +737,7 @@ nxpwifi_cmd_sta_mac_control(struct nxpwifi_private *priv,
 	if (cmd_action != HOST_ACT_GEN_SET) {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "mac_control: only support set cmd\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	cmd->command = cpu_to_le16(HOST_CMD_MAC_CONTROL);
@@ -860,7 +860,7 @@ nxpwifi_ret_sta_802_11d_domain_info(struct nxpwifi_private *priv,
 		nxpwifi_dbg(priv->adapter, FATAL,
 			    "11D: invalid number of triplets %d returned\n",
 			    no_of_triplet);
-		return -1;
+		return -EINVAL;
 	}
 
 	switch (action) {
@@ -871,7 +871,7 @@ nxpwifi_ret_sta_802_11d_domain_info(struct nxpwifi_private *priv,
 	default:
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "11D: invalid action:%d\n", domain_info->action);
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -1383,7 +1383,7 @@ nxpwifi_cmd_sta_cfg_data(struct nxpwifi_private *priv,
 		nxpwifi_dbg(adapter, INFO,
 			    "download cfg_data from config file\n");
 	} else {
-		return -1;
+		return -EINVAL;
 	}
 
 	cmd->command = cpu_to_le16(HOST_CMD_CFG_DATA);
@@ -1400,7 +1400,7 @@ nxpwifi_ret_sta_cfg_data(struct nxpwifi_private *priv,
 {
 	if (resp->result != HOST_RESULT_OK) {
 		nxpwifi_dbg(priv->adapter, ERROR, "Cal data cmd resp failed\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;
@@ -1504,7 +1504,7 @@ nxpwifi_cmd_append_rpn_expression(struct nxpwifi_private *priv,
 		}
 
 		if (stack_ptr - *buffer > STACK_NBYTES)
-			return -1;
+			return -ENOMEM;
 	}
 
 	*buffer = stack_ptr;
@@ -1523,6 +1523,7 @@ nxpwifi_cmd_sta_mef_cfg(struct nxpwifi_private *priv,
 	struct nxpwifi_fw_mef_entry *mef_entry = NULL;
 	u8 *pos = (u8 *)mef_cfg;
 	u16 i;
+	int ret = 0;
 
 	cmd->command = cpu_to_le16(HOST_CMD_MEF_CFG);
 
@@ -1536,16 +1537,18 @@ nxpwifi_cmd_sta_mef_cfg(struct nxpwifi_private *priv,
 		mef_entry->action = mef->mef_entry[i].action;
 		pos += sizeof(*mef_entry);
 
-		if (nxpwifi_cmd_append_rpn_expression(priv,
-						      &mef->mef_entry[i], &pos))
-			return -1;
+		ret = nxpwifi_cmd_append_rpn_expression(priv,
+							&mef->mef_entry[i],
+							&pos);
+		if (ret)
+			return ret;
 
 		mef_entry->exprsize =
 			cpu_to_le16(pos - mef_entry->expr);
 	}
 	cmd->size = cpu_to_le16((u16)(pos - (u8 *)mef_cfg) + S_DS_GEN);
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -1766,7 +1769,7 @@ static int nxpwifi_get_power_level(struct nxpwifi_private *priv, void *data_buf)
 	struct nxpwifi_power_group *pg;
 
 	if (!data_buf)
-		return -1;
+		return -ENOMEM;
 
 	pg_tlv_hdr = (struct nxpwifi_types_power_group *)((u8 *)data_buf);
 	pg = (struct nxpwifi_power_group *)
@@ -3017,7 +3020,7 @@ int nxpwifi_sta_prepare_cmd(struct nxpwifi_private *priv,
 	struct host_cmd_ds_command *cmd =
 		(struct host_cmd_ds_command *)cmd_node->skb->data;
 	void *data_buf = cmd_node->data_buf;
-	int i, ret = -1;
+	int i, ret = -EINVAL;
 
 	for (i = 0; i < ARRAY_SIZE(cmd_table_sta); i++) {
 		if (cmd_no == cmd_table_sta[i].cmd_no) {
@@ -3037,7 +3040,7 @@ int nxpwifi_sta_prepare_cmd(struct nxpwifi_private *priv,
 			    "%s: unknown command: %#x\n",
 			    __func__, cmd_no);
 	else
-		nxpwifi_dbg(adapter, EVENT,
+		nxpwifi_dbg(adapter, CMD,
 			    "%s: command: %#x\n",
 			    __func__, cmd_no);
 
@@ -3094,7 +3097,7 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 		ret = nxpwifi_send_cmd(priv, HOST_CMD_FUNC_INIT,
 				       HOST_ACT_GEN_SET, 0, NULL, true);
 		if (ret)
-			return -1;
+			return ret;
 
 		/* Download calibration data to firmware.
 		 * The cal-data can be read from device tree and/or
@@ -3120,7 +3123,7 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 		ret = nxpwifi_send_cmd(priv, HOST_CMD_GET_HW_SPEC,
 				       HOST_ACT_GEN_GET, 0, NULL, true);
 		if (ret)
-			return -1;
+			return ret;
 
 		/** Set SDIO Single Port RX Aggr Info */
 		if (priv->adapter->iface_type == NXPWIFI_SDIO &&
@@ -3144,7 +3147,7 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 				       HOST_ACT_GEN_SET, 0,
 				       &priv->adapter->tx_buf_size, true);
 		if (ret)
-			return -1;
+			return ret;
 
 		if (priv->bss_type != NXPWIFI_BSS_TYPE_UAP) {
 			/* Enable IEEE PS by default */
@@ -3154,7 +3157,7 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 					       EN_AUTO_PS, BITMAP_STA_PS, NULL,
 					       true);
 			if (ret)
-				return -1;
+				return ret;
 		}
 
 		nxpwifi_send_cmd(priv, HOST_CMD_CHAN_REGION_CFG,
@@ -3165,14 +3168,14 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 	ret = nxpwifi_send_cmd(priv, HOST_CMD_TX_RATE_CFG,
 			       HOST_ACT_GEN_GET, 0, NULL, true);
 	if (ret)
-		return -1;
+		return ret;
 	priv->data_rate = 0;
 
 	/* get tx power */
 	ret = nxpwifi_send_cmd(priv, HOST_CMD_RF_TX_PWR,
 			       HOST_ACT_GEN_GET, 0, NULL, true);
 	if (ret)
-		return -1;
+		return ret;
 
 	memset(&amsdu_aggr_ctrl, 0, sizeof(amsdu_aggr_ctrl));
 	amsdu_aggr_ctrl.enable = true;
@@ -3181,14 +3184,14 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 			       HOST_ACT_GEN_SET, 0,
 			       &amsdu_aggr_ctrl, true);
 	if (ret)
-		return -1;
+		return ret;
 	/* MAC Control must be the last command in init_fw */
 	/* set MAC Control */
 	ret = nxpwifi_send_cmd(priv, HOST_CMD_MAC_CONTROL,
 			       HOST_ACT_GEN_SET, 0,
 			       &priv->curr_pkt_filter, true);
 	if (ret)
-		return -1;
+		return ret;
 
 	if (!disable_auto_ds && first_sta &&
 	    priv->bss_type != NXPWIFI_BSS_TYPE_UAP) {
@@ -3199,7 +3202,7 @@ int nxpwifi_sta_init_cmd(struct nxpwifi_private *priv, u8 first_sta, bool init)
 				       EN_AUTO_PS, BITMAP_AUTO_DS,
 				       &auto_ds, true);
 		if (ret)
-			return -1;
+			return ret;
 	}
 
 	if (priv->bss_type != NXPWIFI_BSS_TYPE_UAP) {

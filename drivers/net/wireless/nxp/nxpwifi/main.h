@@ -1006,7 +1006,7 @@ struct nxpwifi_adapter {
 
 void nxpwifi_process_tx_queue(struct nxpwifi_adapter *adapter);
 
-int nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter);
+void nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter);
 
 void nxpwifi_set_trans_start(struct net_device *dev);
 
@@ -1021,7 +1021,7 @@ void nxpwifi_free_priv(struct nxpwifi_private *priv);
 
 int nxpwifi_init_fw(struct nxpwifi_adapter *adapter);
 
-int nxpwifi_init_fw_complete(struct nxpwifi_adapter *adapter);
+void nxpwifi_init_fw_complete(struct nxpwifi_adapter *adapter);
 
 void nxpwifi_shutdown_drv(struct nxpwifi_adapter *adapter);
 
@@ -1239,7 +1239,7 @@ nxpwifi_get_unused_bss_num(struct nxpwifi_adapter *adapter, u8 bss_type)
 	for (j = 0; j < NXPWIFI_MAX_BSS_NUM; j++)
 		if (!index[j])
 			return j;
-	return -1;
+	return -ENOENT;
 }
 
 /* This function returns the first available unused private structure pointer.
@@ -1344,7 +1344,7 @@ int nxpwifi_init_shutdown_fw(struct nxpwifi_private *priv,
 int nxpwifi_add_card(void *card, struct completion *fw_done,
 		     struct nxpwifi_if_ops *if_ops, u8 iface_type,
 		     struct device *dev);
-int nxpwifi_remove_card(struct nxpwifi_adapter *adapter);
+void nxpwifi_remove_card(struct nxpwifi_adapter *adapter);
 
 void nxpwifi_get_version(struct nxpwifi_adapter *adapter, char *version,
 			 int maxlen);
@@ -1358,7 +1358,7 @@ int nxpwifi_wait_queue_complete(struct nxpwifi_adapter *adapter,
 int nxpwifi_bss_start(struct nxpwifi_private *priv, struct cfg80211_bss *bss,
 		      struct cfg80211_ssid *req_ssid);
 int nxpwifi_cancel_hs(struct nxpwifi_private *priv, int cmd_type);
-int nxpwifi_enable_hs(struct nxpwifi_adapter *adapter);
+bool nxpwifi_enable_hs(struct nxpwifi_adapter *adapter);
 int nxpwifi_disable_auto_ds(struct nxpwifi_private *priv);
 int nxpwifi_drv_get_data_rate(struct nxpwifi_private *priv, u32 *rate);
 int nxpwifi_request_scan(struct nxpwifi_private *priv,
@@ -1407,9 +1407,9 @@ int nxpwifi_drv_get_driver_version(struct nxpwifi_adapter *adapter,
 int nxpwifi_set_tx_power(struct nxpwifi_private *priv,
 			 struct nxpwifi_power_cfg *power_cfg);
 
-int nxpwifi_main_process(struct nxpwifi_adapter *adapter);
+void nxpwifi_main_process(struct nxpwifi_adapter *adapter);
 
-int nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb);
+void nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb);
 
 int nxpwifi_get_bss_info(struct nxpwifi_private *priv,
 			 struct nxpwifi_bss_info *info);
@@ -1516,5 +1516,5 @@ void nxpwifi_dev_debugfs_init(struct nxpwifi_private *priv);
 void nxpwifi_dev_debugfs_remove(struct nxpwifi_private *priv);
 #endif
 int nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter);
-int nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter);
+void nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter);
 #endif /* !_NXPWIFI_MAIN_H_ */

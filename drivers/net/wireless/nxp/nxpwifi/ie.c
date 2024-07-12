@@ -10,10 +10,10 @@
 #include "cmdevt.h"
 
 /* This function checks if current IE index is used by any on other interface.
- * Return: -1: yes, current IE index is used by someone else.
- *          0: no, current IE index is NOT used by other interface.
+ * Return: true: yes, current IE index is used by someone else.
+ *         false: no, current IE index is NOT used by other interface.
  */
-static int
+static bool
 nxpwifi_ie_index_used_by_other_intf(struct nxpwifi_private *priv, u16 idx)
 {
 	int i;
@@ -24,11 +24,11 @@ nxpwifi_ie_index_used_by_other_intf(struct nxpwifi_private *priv, u16 idx)
 		if (adapter->priv[i] != priv) {
 			ie = &adapter->priv[i]->mgmt_ie[idx];
 			if (ie->mgmt_subtype_mask && ie->ie_length)
-				return -1;
+				return true;
 		}
 	}
 
-	return 0;
+	return false;
 }
 
 /* Get unused IE index. This index will be used for setting new IE */
@@ -62,7 +62,7 @@ nxpwifi_ie_get_autoidx(struct nxpwifi_private *priv, u16 subtype_mask,
 		}
 	}
 
-	return -1;
+	return -ENOENT;
 }
 
 /* This function prepares IE data buffer for command to be sent to FW */
@@ -86,16 +86,16 @@ nxpwifi_update_autoindex_ies(struct nxpwifi_private *priv,
 		travel_len += tlv_len + NXPWIFI_IE_HDR_SIZE;
 
 		if (input_len < tlv_len + NXPWIFI_IE_HDR_SIZE)
-			return -1;
+			return -EINVAL;
 		index = le16_to_cpu(ie->ie_index);
 		mask = le16_to_cpu(ie->mgmt_subtype_mask);
 
 		if (index == NXPWIFI_AUTO_IDX_MASK) {
 			/* automatic addition */
 			if (nxpwifi_ie_get_autoidx(priv, mask, ie, &index))
-				return -1;
+				return -ENOENT;
 			if (index == NXPWIFI_AUTO_IDX_MASK)
-				return -1;
+				return -EINVAL;
 
 			tmp = (u8 *)&priv->mgmt_ie[index].ie_buffer;
 			memcpy(tmp, &ie->ie_buffer, le16_to_cpu(ie->ie_length));
@@ -107,12 +107,12 @@ nxpwifi_update_autoindex_ies(struct nxpwifi_private *priv,
 			ie->ie_index = cpu_to_le16(index);
 		} else {
 			if (mask != NXPWIFI_DELETE_MASK)
-				return -1;
+				return -EINVAL;
 			/* Check if this index is being used on any
 			 * other interface.
 			 */
 			if (nxpwifi_ie_index_used_by_other_intf(priv, index))
-				return -1;
+				return -EPERM;
 
 			ie->ie_length = 0;
 			memcpy(&priv->mgmt_ie[index], ie,
@@ -320,7 +320,7 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 	u16 gen_idx = NXPWIFI_AUTO_IDX_MASK, ie_len = 0;
 	int left_len, parsed_len = 0;
 	unsigned int token_len;
-	int err = 0;
+	int ret = 0;
 
 	if (!info->tail || !info->tail_len)
 		return 0;
@@ -338,8 +338,8 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 		hdr = (void *)(info->tail + parsed_len);
 		token_len = hdr->len + sizeof(struct ieee_types_header);
 		if (token_len > left_len) {
-			err = -EINVAL;
-			goto out;
+			ret = -EINVAL;
+			goto done;
 		}
 
 		switch (hdr->element_id) {
@@ -364,8 +364,8 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 			fallthrough;
 		default:
 			if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
-				err = -EINVAL;
-				goto out;
+				ret = -EINVAL;
+				goto done;
 			}
 			memcpy(gen_ie->ie_buffer + ie_len, hdr, token_len);
 			ie_len += token_len;
@@ -384,15 +384,15 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 	if (vendorhdr) {
 		token_len = vendorhdr->len + sizeof(struct ieee_types_header);
 		if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
-			err = -EINVAL;
-			goto out;
+			ret = -EINVAL;
+			goto done;
 		}
 		memcpy(gen_ie->ie_buffer + ie_len, vendorhdr, token_len);
 		ie_len += token_len;
 	}
 
 	if (!ie_len)
-		goto out;
+		goto done;
 
 	gen_ie->ie_index = cpu_to_le16(gen_idx);
 	gen_ie->mgmt_subtype_mask = cpu_to_le16(MGMT_MASK_BEACON |
@@ -400,17 +400,17 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 						MGMT_MASK_ASSOC_RESP);
 	gen_ie->ie_length = cpu_to_le16(ie_len);
 
-	if (nxpwifi_update_uap_custom_ie(priv, gen_ie, &gen_idx, NULL, NULL,
-					 NULL, NULL)) {
-		err = -EINVAL;
-		goto out;
-	}
+	ret = nxpwifi_update_uap_custom_ie(priv, gen_ie, &gen_idx, NULL,
+					   NULL, NULL, NULL);
+
+	if (ret)
+		goto done;
 
 	priv->gen_idx = gen_idx;
 
- out:
+ done:
 	kfree(gen_ie);
-	return err;
+	return ret;
 }
 
 /* This function parses different IEs-head & tail IEs, beacon IEs,
@@ -445,12 +445,11 @@ int nxpwifi_del_mgmt_ies(struct nxpwifi_private *priv)
 		gen_ie->ie_index = cpu_to_le16(priv->gen_idx);
 		gen_ie->mgmt_subtype_mask = cpu_to_le16(NXPWIFI_DELETE_MASK);
 		gen_ie->ie_length = 0;
-		if (nxpwifi_update_uap_custom_ie(priv, gen_ie, &priv->gen_idx,
-						 NULL, &priv->proberesp_idx,
-						 NULL, &priv->assocresp_idx)) {
-			ret = -1;
+		ret = nxpwifi_update_uap_custom_ie(priv, gen_ie, &priv->gen_idx,
+						   NULL, &priv->proberesp_idx,
+						   NULL, &priv->assocresp_idx);
+		if (ret)
 			goto done;
-		}
 
 		priv->gen_idx = NXPWIFI_AUTO_IDX_MASK;
 	}

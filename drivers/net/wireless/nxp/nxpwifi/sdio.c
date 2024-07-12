@@ -258,7 +258,7 @@ static int nxpwifi_sdio_resume(struct device *dev)
 static int
 nxpwifi_write_reg_locked(struct sdio_func *func, u32 reg, u8 data)
 {
-	int ret = -1;
+	int ret;
 
 	sdio_writeb(func, data, reg, &ret);
 	return ret;
@@ -285,7 +285,7 @@ static int
 nxpwifi_read_reg(struct nxpwifi_adapter *adapter, u32 reg, u8 *data)
 {
 	struct sdio_mmc_card *card = adapter->card;
-	int ret = -1;
+	int ret;
 	u8 val;
 
 	sdio_claim_host(card->func);
@@ -319,7 +319,7 @@ nxpwifi_write_data_sync(struct nxpwifi_adapter *adapter,
 	if (test_bit(NXPWIFI_IS_SUSPENDED, &adapter->work_flags)) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: not allowed while suspended\n", __func__);
-		return -1;
+		return -EPERM;
 	}
 
 	sdio_claim_host(card->func);
@@ -364,15 +364,18 @@ nxpwifi_sdio_read_fw_status(struct nxpwifi_adapter *adapter, u16 *dat)
 	struct sdio_mmc_card *card = adapter->card;
 	const struct nxpwifi_sdio_card_reg *reg = card->reg;
 	u8 fws0, fws1;
+	int ret;
 
-	if (nxpwifi_read_reg(adapter, reg->status_reg_0, &fws0))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, reg->status_reg_0, &fws0);
+	if (ret)
+		return ret;
 
-	if (nxpwifi_read_reg(adapter, reg->status_reg_1, &fws1))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, reg->status_reg_1, &fws1);
+	if (ret)
+		return ret;
 
 	*dat = (u16)((fws1 << 8) | fws0);
-	return 0;
+	return ret;
 }
 
 /* This function checks the firmware status in card.
@@ -394,7 +397,7 @@ static int nxpwifi_check_fw_status(struct nxpwifi_adapter *adapter,
 		}
 
 		msleep(100);
-		ret = -1;
+		ret = -EPERM;
 	}
 
 	if (firmware_stat == FIRMWARE_READY_SDIO)
@@ -410,12 +413,13 @@ static int nxpwifi_check_fw_status(struct nxpwifi_adapter *adapter,
  */
 static int nxpwifi_check_winner_status(struct nxpwifi_adapter *adapter)
 {
-	int ret = 0;
+	int ret;
 	u8 winner = 0;
 	struct sdio_mmc_card *card = adapter->card;
 
-	if (nxpwifi_read_reg(adapter, card->reg->status_reg_0, &winner))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->status_reg_0, &winner);
+	if (ret)
+		return ret;
 
 	if (winner)
 		adapter->winner = 0;
@@ -515,7 +519,7 @@ static int nxpwifi_sdio_suspend(struct device *dev)
 			    "cmd: failed to suspend\n");
 		clear_bit(NXPWIFI_IS_HS_ENABLING, &adapter->work_flags);
 		nxpwifi_disable_wake(adapter);
-		return -EFAULT;
+		return -EPERM;
 	}
 
 	nxpwifi_dbg(adapter, INFO,
@@ -611,33 +615,38 @@ static int nxpwifi_init_sdio_new_mode(struct nxpwifi_adapter *adapter)
 {
 	u8 reg;
 	struct sdio_mmc_card *card = adapter->card;
+	int ret;
 
 	adapter->ioport = MEM_PORT;
 
 	/* enable sdio new mode */
-	if (nxpwifi_read_reg(adapter, card->reg->card_cfg_2_1_reg, &reg))
-		return -1;
-	if (nxpwifi_write_reg(adapter, card->reg->card_cfg_2_1_reg,
-			      reg | CMD53_NEW_MODE))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->card_cfg_2_1_reg, &reg);
+	if (ret)
+		return ret;
+	ret = nxpwifi_write_reg(adapter, card->reg->card_cfg_2_1_reg,
+				reg | CMD53_NEW_MODE);
+	if (ret)
+		return ret;
 
 	/* Configure cmd port and enable reading rx length from the register */
-	if (nxpwifi_read_reg(adapter, card->reg->cmd_cfg_0, &reg))
-		return -1;
-	if (nxpwifi_write_reg(adapter, card->reg->cmd_cfg_0,
-			      reg | CMD_PORT_RD_LEN_EN))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->cmd_cfg_0, &reg);
+	if (ret)
+		return ret;
+	ret = nxpwifi_write_reg(adapter, card->reg->cmd_cfg_0,
+				reg | CMD_PORT_RD_LEN_EN);
+	if (ret)
+		return ret;
 
 	/* Enable Dnld/Upld ready auto reset for cmd port after cmd53 is
 	 * completed
 	 */
-	if (nxpwifi_read_reg(adapter, card->reg->cmd_cfg_1, &reg))
-		return -1;
-	if (nxpwifi_write_reg(adapter, card->reg->cmd_cfg_1,
-			      reg | CMD_PORT_AUTO_EN))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->cmd_cfg_1, &reg);
+	if (ret)
+		return ret;
+	ret = nxpwifi_write_reg(adapter, card->reg->cmd_cfg_1,
+				reg | CMD_PORT_AUTO_EN);
 
-	return 0;
+	return ret;
 }
 
 /* This function initializes the IO ports.
@@ -651,28 +660,32 @@ static int nxpwifi_init_sdio_ioport(struct nxpwifi_adapter *adapter)
 {
 	u8 reg;
 	struct sdio_mmc_card *card = adapter->card;
+	int ret;
 
-	if (nxpwifi_init_sdio_new_mode(adapter))
-		return -1;
+	ret = nxpwifi_init_sdio_new_mode(adapter);
+	if (ret)
+		return ret;
 
 	nxpwifi_dbg(adapter, INFO,
 		    "info: SDIO FUNC1 IO port: %#x\n", adapter->ioport);
 
 	/* Set Host interrupt reset to read to clear */
-	if (nxpwifi_read_reg(adapter, card->reg->host_int_rsr_reg, &reg))
-		return -1;
-	if (nxpwifi_write_reg(adapter, card->reg->host_int_rsr_reg,
-			      reg | card->reg->sdio_int_mask))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->host_int_rsr_reg, &reg);
+	if (ret)
+		return ret;
+	ret = nxpwifi_write_reg(adapter, card->reg->host_int_rsr_reg,
+				reg | card->reg->sdio_int_mask);
+	if (ret)
+		return ret;
 
 	/* Dnld/Upld ready set to auto reset */
-	if (nxpwifi_read_reg(adapter, card->reg->card_misc_cfg_reg, &reg))
-		return -1;
-	if (nxpwifi_write_reg(adapter, card->reg->card_misc_cfg_reg,
-			      reg | AUTO_RE_ENABLE_INT))
-		return -1;
+	ret = nxpwifi_read_reg(adapter, card->reg->card_misc_cfg_reg, &reg);
+	if (ret)
+		return ret;
+	ret = nxpwifi_write_reg(adapter, card->reg->card_misc_cfg_reg,
+				reg | AUTO_RE_ENABLE_INT);
 
-	return 0;
+	return ret;
 }
 
 /* This function sends data to the card.
@@ -694,11 +707,10 @@ static int nxpwifi_write_data_to_card(struct nxpwifi_adapter *adapter,
 				nxpwifi_dbg(adapter, ERROR,
 					    "write CFG reg failed\n");
 
-			ret = -1;
 			if (i > MAX_WRITE_IOMEM_RETRY)
 				return ret;
 		}
-	} while (ret == -1);
+	} while (ret);
 
 	return ret;
 }
@@ -720,10 +732,10 @@ static int nxpwifi_get_rd_port(struct nxpwifi_adapter *adapter, u8 *port)
 		    "data: mp_rd_bitmap=0x%08x\n", rd_bitmap);
 
 	if (!(rd_bitmap & reg->data_port_mask))
-		return -1;
+		return -EINVAL;
 
 	if (!(card->mp_rd_bitmap & (1 << card->curr_rd_port)))
-		return -1;
+		return -EINVAL;
 
 	/* We are now handling the SDIO data ports */
 	card->mp_rd_bitmap &= (u32)(~(1 << card->curr_rd_port));
@@ -784,9 +796,11 @@ nxpwifi_sdio_poll_card_status(struct nxpwifi_adapter *adapter, u8 bits)
 	struct sdio_mmc_card *card = adapter->card;
 	u32 tries;
 	u8 cs;
+	int ret;
 
 	for (tries = 0; tries < MAX_POLL_TRIES; tries++) {
-		if (nxpwifi_read_reg(adapter, card->reg->poll_reg, &cs))
+		ret = nxpwifi_read_reg(adapter, card->reg->poll_reg, &cs);
+		if (ret)
 			break;
 		else if ((cs & bits) == bits)
 			return 0;
@@ -797,7 +811,7 @@ nxpwifi_sdio_poll_card_status(struct nxpwifi_adapter *adapter, u8 bits)
 	nxpwifi_dbg(adapter, ERROR,
 		    "poll card status failed, tries = %d\n", tries);
 
-	return -1;
+	return ret;
 }
 
 /* This function disables the host interrupt.
@@ -891,7 +905,7 @@ static int nxpwifi_sdio_enable_host_int(struct nxpwifi_adapter *adapter)
 	if (ret) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "claim irq failed: ret=%d\n", ret);
-		goto out;
+		goto done;
 	}
 
 	/* Simply write the mask to the register */
@@ -903,7 +917,7 @@ static int nxpwifi_sdio_enable_host_int(struct nxpwifi_adapter *adapter)
 		sdio_release_irq(func);
 	}
 
-out:
+done:
 	sdio_release_host(func);
 	return ret;
 }
@@ -920,7 +934,7 @@ static int nxpwifi_sdio_card_to_host(struct nxpwifi_adapter *adapter,
 	if (!buffer) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: buffer is NULL\n", __func__);
-		return -1;
+		return -EINVAL;
 	}
 
 	ret = nxpwifi_read_data_sync(adapter, buffer, npayload, ioport, 1);
@@ -929,7 +943,7 @@ static int nxpwifi_sdio_card_to_host(struct nxpwifi_adapter *adapter,
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: read iomem failed: %d\n", __func__,
 			ret);
-		return -1;
+		return ret;
 	}
 
 	nb = get_unaligned_le16((buffer));
@@ -937,7 +951,7 @@ static int nxpwifi_sdio_card_to_host(struct nxpwifi_adapter *adapter,
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: invalid packet, nb=%d npayload=%d\n",
 			    __func__, nb, npayload);
-		return -1;
+		return -EINVAL;
 	}
 
 	*type = get_unaligned_le16((buffer + 2));
@@ -969,7 +983,7 @@ static int nxpwifi_prog_fw_w_helper(struct nxpwifi_adapter *adapter,
 	if (!firmware_len) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "firmware image not found! Terminating download\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	nxpwifi_dbg(adapter, INFO,
@@ -1034,7 +1048,7 @@ static int nxpwifi_prog_fw_w_helper(struct nxpwifi_adapter *adapter,
 			nxpwifi_dbg(adapter, ERROR,
 				    "FW dnld failed @ %d, invalid length %d\n",
 				    offset, len);
-			ret = -1;
+			ret = -EINVAL;
 			goto done;
 		}
 
@@ -1046,7 +1060,7 @@ static int nxpwifi_prog_fw_w_helper(struct nxpwifi_adapter *adapter,
 				nxpwifi_dbg(adapter, ERROR,
 					    "FW dnld failed @ %d, over max retry\n",
 					    offset);
-				ret = -1;
+				ret = -EIO;
 				goto done;
 			}
 			nxpwifi_dbg(adapter, ERROR,
@@ -1082,7 +1096,6 @@ static int nxpwifi_prog_fw_w_helper(struct nxpwifi_adapter *adapter,
 				nxpwifi_dbg(adapter, ERROR,
 					    "write CFG reg failed\n");
 
-			ret = -1;
 			goto done;
 		}
 
@@ -1157,8 +1170,8 @@ static void nxpwifi_deaggr_sdio_pkt(struct nxpwifi_adapter *adapter,
  * a command response, or an event, and the correct handler
  * function is invoked.
  */
-static int nxpwifi_decode_rx_packet(struct nxpwifi_adapter *adapter,
-				    struct sk_buff *skb, u32 upld_typ)
+static void nxpwifi_decode_rx_packet(struct nxpwifi_adapter *adapter,
+				     struct sk_buff *skb, u32 upld_typ)
 {
 	u8 *cmd_buf;
 	u16 pkt_len;
@@ -1244,8 +1257,6 @@ static int nxpwifi_decode_rx_packet(struct nxpwifi_adapter *adapter,
 		dev_kfree_skb_any(skb);
 		break;
 	}
-
-	return 0;
 }
 
 /* This function transfers received packets from card to driver, performing
@@ -1268,6 +1279,7 @@ static int nxpwifi_sdio_card_to_host_mp_aggr(struct nxpwifi_adapter *adapter,
 	struct sk_buff *skb = NULL;
 	u32 pkt_len, pkt_type, mport, pind;
 	u8 *curr_ptr;
+	int ret = 0;
 
 	if (!card->mpa_rx.enabled) {
 		nxpwifi_dbg(adapter, WARN,
@@ -1352,8 +1364,9 @@ static int nxpwifi_sdio_card_to_host_mp_aggr(struct nxpwifi_adapter *adapter,
 		if (card->mpa_rx.pkt_cnt == 1)
 			mport = adapter->ioport + card->mpa_rx.start_port;
 
-		if (nxpwifi_read_data_sync(adapter, card->mpa_rx.buf,
-					   card->mpa_rx.buf_len, mport, 1))
+		ret = nxpwifi_read_data_sync(adapter, card->mpa_rx.buf,
+					     card->mpa_rx.buf_len, mport, 1);
+		if (ret)
 			goto error;
 
 		curr_ptr = card->mpa_rx.buf;
@@ -1413,18 +1426,21 @@ rx_curr_single:
 			nxpwifi_dbg(adapter, ERROR,
 				    "single skb allocated fail,\t"
 				    "drop pkt port=%d len=%d\n", port, rx_len);
-			if (nxpwifi_sdio_card_to_host(adapter, &pkt_type,
-						      card->mpa_rx.buf, rx_len,
-						      adapter->ioport + port))
+			ret = nxpwifi_sdio_card_to_host(adapter, &pkt_type,
+							card->mpa_rx.buf,
+							rx_len,
+							adapter->ioport + port);
+			if (ret)
 				goto error;
 			return 0;
 		}
 
 		skb_put(skb, rx_len);
 
-		if (nxpwifi_sdio_card_to_host(adapter, &pkt_type,
-					      skb->data, skb->len,
-					      adapter->ioport + port))
+		ret = nxpwifi_sdio_card_to_host(adapter, &pkt_type,
+						skb->data, skb->len,
+						adapter->ioport + port);
+		if (ret)
 			goto error;
 		if (!adapter->sdio_rx_aggr_enable &&
 		    pkt_type == NXPWIFI_TYPE_AGGR_DATA) {
@@ -1453,7 +1469,7 @@ error:
 		/* Single transfer pending. Free curr buff also */
 		dev_kfree_skb_any(skb);
 
-	return -1;
+	return ret;
 }
 
 /* This function checks the current interrupt status.
@@ -1508,19 +1524,20 @@ static int nxpwifi_process_int_status(struct nxpwifi_adapter *adapter)
 		if (rx_len <= adapter->intf_hdr_len ||
 		    (rx_blocks * NXPWIFI_SDIO_BLOCK_SIZE) >
 		     NXPWIFI_RX_DATA_BUF_SIZE)
-			return -1;
+			return -EINVAL;
 		rx_len = (u16)(rx_blocks * NXPWIFI_SDIO_BLOCK_SIZE);
 		nxpwifi_dbg(adapter, INFO, "info: rx_len = %d\n", rx_len);
 
 		skb = nxpwifi_alloc_dma_align_buf(rx_len, GFP_KERNEL);
 		if (!skb)
-			return -1;
+			return -ENOMEM;
 
 		skb_put(skb, rx_len);
 
-		if (nxpwifi_sdio_card_to_host(adapter, &pkt_type, skb->data,
-					      skb->len, adapter->ioport |
-							CMD_PORT_SLCT)) {
+		ret = nxpwifi_sdio_card_to_host(adapter, &pkt_type, skb->data,
+						skb->len, adapter->ioport |
+						CMD_PORT_SLCT);
+		if (ret) {
 			nxpwifi_dbg(adapter, ERROR,
 				    "%s: failed to card_to_host", __func__);
 			dev_kfree_skb_any(skb);
@@ -1590,15 +1607,16 @@ static int nxpwifi_process_int_status(struct nxpwifi_adapter *adapter)
 				nxpwifi_dbg(adapter, ERROR,
 					    "invalid rx_len=%d\n",
 					    rx_len);
-				return -1;
+				return -EINVAL;
 			}
 
 			rx_len = (u16)(rx_blocks * NXPWIFI_SDIO_BLOCK_SIZE);
 			nxpwifi_dbg(adapter, INFO, "info: rx_len = %d\n",
 				    rx_len);
 
-			if (nxpwifi_sdio_card_to_host_mp_aggr(adapter, rx_len,
-							      port)) {
+			ret = nxpwifi_sdio_card_to_host_mp_aggr(adapter, rx_len,
+								port);
+			if (ret) {
 				nxpwifi_dbg(adapter, ERROR,
 					    "card_to_host_mpa failed: int status=%#x\n",
 					    sdio_ireg);
@@ -1630,7 +1648,7 @@ term_cmd:
 		nxpwifi_dbg(adapter, INFO,
 			    "info: CFG reg val =%x\n", cr);
 
-	return -1;
+	return ret;
 }
 
 /* This function aggregates transmission buffers in driver and downloads
@@ -1886,7 +1904,7 @@ static int nxpwifi_alloc_sdio_mpa_buffers(struct nxpwifi_adapter *adapter,
 
 	card->mpa_tx.buf = kzalloc(mpa_tx_buf_size, GFP_KERNEL);
 	if (!card->mpa_tx.buf) {
-		ret = -1;
+		ret = -ENOMEM;
 		goto error;
 	}
 
@@ -1896,7 +1914,7 @@ static int nxpwifi_alloc_sdio_mpa_buffers(struct nxpwifi_adapter *adapter,
 			    (u32)SDIO_MAX_AGGR_BUF_SIZE);
 	card->mpa_rx.buf = kzalloc(rx_buf_size, GFP_KERNEL);
 	if (!card->mpa_rx.buf) {
-		ret = -1;
+		ret = -ENOMEM;
 		goto error;
 	}
 
@@ -2068,7 +2086,7 @@ static int nxpwifi_init_sdio(struct nxpwifi_adapter *adapter)
 	}
 
 	adapter->ext_scan = card->can_ext_scan;
-	return 0;
+	return ret;
 }
 
 /* This function resets the MPA Tx and Rx buffers.
@@ -2334,7 +2352,7 @@ static void nxpwifi_sdio_generic_fw_dump(struct nxpwifi_adapter *adapter)
 	u8 start_flag = 0, done_flag = 0;
 	u8 *dbg_ptr, *end_ptr;
 	enum rdwr_status stat;
-	int ret = -1, tries;
+	int ret = -EPERM, tries;
 
 	if (!card->fw_dump_enh)
 		return;
@@ -2369,7 +2387,7 @@ static void nxpwifi_sdio_generic_fw_dump(struct nxpwifi_adapter *adapter)
 			if (tries == MAX_POLL_TRIES) {
 				nxpwifi_dbg(adapter, ERROR,
 					    "FW not ready to dump\n");
-				ret = -1;
+				ret = -EPERM;
 				goto done;
 			}
 		}
@@ -2378,7 +2396,7 @@ static void nxpwifi_sdio_generic_fw_dump(struct nxpwifi_adapter *adapter)
 
 	entry->mem_ptr = vmalloc(0xf0000 + 1);
 	if (!entry->mem_ptr) {
-		ret = -1;
+		ret = -ENOMEM;
 		goto done;
 	}
 	dbg_ptr = entry->mem_ptr;
