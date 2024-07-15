@@ -1888,7 +1888,7 @@ nxpwifi_cfg80211_scan(struct wiphy *wiphy,
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	int i, offset, ret;
 	struct ieee80211_channel *chan;
-	struct ieee_types_header *ie;
+	struct element *ie;
 	struct nxpwifi_user_scan_cfg *user_scan_cfg;
 	u8 mac_addr[ETH_ALEN];
 
@@ -1932,9 +1932,10 @@ nxpwifi_cfg80211_scan(struct wiphy *wiphy,
 			if (priv->vs_ie[i].mask != NXPWIFI_VSIE_MASK_CLEAR)
 				continue;
 			priv->vs_ie[i].mask = NXPWIFI_VSIE_MASK_SCAN;
-			ie = (struct ieee_types_header *)(request->ie + offset);
-			memcpy(&priv->vs_ie[i].ie, ie, sizeof(*ie) + ie->len);
-			offset += sizeof(*ie) + ie->len;
+			ie = (struct element *)(request->ie + offset);
+			memcpy(&priv->vs_ie[i].ie, ie,
+			       sizeof(*ie) + ie->datalen);
+			offset += sizeof(*ie) + ie->datalen;
 
 			if (offset >= request->ie_len)
 				break;
@@ -2000,7 +2001,7 @@ nxpwifi_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	int i, offset;
 	struct ieee80211_channel *chan;
 	struct nxpwifi_bg_scan_cfg *bgscan_cfg;
-	struct ieee_types_header *ie;
+	struct element *ie;
 	int ret;
 
 	if (!request || (!request->n_ssids && !request->n_match_sets)) {
@@ -2031,9 +2032,10 @@ nxpwifi_cfg80211_sched_scan_start(struct wiphy *wiphy,
 			if (priv->vs_ie[i].mask != NXPWIFI_VSIE_MASK_CLEAR)
 				continue;
 			priv->vs_ie[i].mask = NXPWIFI_VSIE_MASK_BGSCAN;
-			ie = (struct ieee_types_header *)(request->ie + offset);
-			memcpy(&priv->vs_ie[i].ie, ie, sizeof(*ie) + ie->len);
-			offset += sizeof(*ie) + ie->len;
+			ie = (struct element *)(request->ie + offset);
+			memcpy(&priv->vs_ie[i].ie, ie,
+			       sizeof(*ie) + ie->datalen);
+			offset += sizeof(*ie) + ie->datalen;
 
 			if (offset >= request->ie_len)
 				break;

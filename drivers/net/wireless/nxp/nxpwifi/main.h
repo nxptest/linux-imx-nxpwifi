@@ -329,44 +329,9 @@ struct nxpwifi_802_11_security {
 	u32 encryption_mode;
 };
 
-struct ieee_types_header {
-	u8 element_id;
-	u8 len;
-} __packed;
-
 struct ieee_types_vendor_specific {
-	struct ieee_types_vendor_header vend_hdr;
-	u8 data[IEEE_MAX_IE_SIZE - sizeof(struct ieee_types_vendor_header)];
-} __packed;
-
-struct ieee_types_generic {
-	struct ieee_types_header ieee_hdr;
-	u8 data[IEEE_MAX_IE_SIZE - sizeof(struct ieee_types_header)];
-} __packed;
-
-struct ieee_types_bss_co_2040 {
-	struct ieee_types_header ieee_hdr;
-	u8 bss_2040co;
-} __packed;
-
-struct ieee_types_extcap {
-	struct ieee_types_header ieee_hdr;
-	u8 ext_capab[8];
-} __packed;
-
-struct ieee_types_vht_cap {
-	struct ieee_types_header ieee_hdr;
-	struct ieee80211_vht_cap vhtcap;
-} __packed;
-
-struct ieee_types_vht_oper {
-	struct ieee_types_header ieee_hdr;
-	struct ieee80211_vht_operation vhtoper;
-} __packed;
-
-struct ieee_types_aid {
-	struct ieee_types_header ieee_hdr;
-	u16 aid;
+	struct ieee80211_vendor_ie vend_hdr;
+	u8 data[IEEE_MAX_IE_SIZE - sizeof(struct ieee80211_vendor_ie)];
 } __packed;
 
 struct nxpwifi_bssdescriptor {
@@ -390,9 +355,9 @@ struct nxpwifi_bssdescriptor {
 	u64 fw_tsf;
 	u64 timestamp;
 	union ieee_types_phy_param_set phy_param_set;
-	union ieee_types_ss_param_set ss_param_set;
+	struct ieee_types_cf_param_set cf_param_set;
 	u16 cap_info_bitmap;
-	struct ieee_types_wmm_parameter wmm_ie;
+	struct ieee80211_wmm_param_ie wmm_ie;
 	u8  disable_11n;
 	struct ieee80211_ht_cap *bcn_ht_cap;
 	u16 ht_cap_offset;
@@ -411,9 +376,9 @@ struct nxpwifi_bssdescriptor {
 	u8 disable_11ac;
 	struct ieee_types_vendor_specific *bcn_wpa_ie;
 	u16 wpa_offset;
-	struct ieee_types_generic *bcn_rsn_ie;
+	struct element *bcn_rsn_ie;
 	u16 rsn_offset;
-	struct ieee_types_generic *bcn_rsnx_ie;
+	struct element *bcn_rsnx_ie;
 	u16 rsnx_offset;
 	u8 *beacon_buf;
 	u32 beacon_buf_size;

@@ -1145,7 +1145,7 @@ static int
 nxpwifi_set_gen_ie_helper(struct nxpwifi_private *priv, u8 *ie_data_ptr,
 			  u16 ie_len)
 {
-	struct ieee_types_vendor_header *pvendor_ie;
+	struct ieee80211_vendor_ie *pvendor_ie;
 	static const u8 wpa_oui[] = { 0x00, 0x50, 0xf2, 0x01 };
 	static const u8 wps_oui[] = { 0x00, 0x50, 0xf2, 0x04 };
 	u16 unparsed_len = ie_len, cur_ie_len;
@@ -1156,13 +1156,13 @@ nxpwifi_set_gen_ie_helper(struct nxpwifi_private *priv, u8 *ie_data_ptr,
 		priv->wps.session_enable = false;
 		return 0;
 	} else if (!ie_data_ptr ||
-		   ie_len <= sizeof(struct ieee_types_header)) {
+		   ie_len <= sizeof(struct element)) {
 		return -EINVAL;
 	}
-	pvendor_ie = (struct ieee_types_vendor_header *)ie_data_ptr;
+	pvendor_ie = (struct ieee80211_vendor_ie *)ie_data_ptr;
 
 	while (pvendor_ie) {
-		cur_ie_len = pvendor_ie->len + sizeof(struct ieee_types_header);
+		cur_ie_len = pvendor_ie->len + sizeof(struct element);
 
 		if (pvendor_ie->element_id == WLAN_EID_RSN) {
 			/* IE is a WPA/WPA2 IE so call set_wpa function */
@@ -1218,10 +1218,10 @@ nxpwifi_set_gen_ie_helper(struct nxpwifi_private *priv, u8 *ie_data_ptr,
 next_ie:
 		unparsed_len -= cur_ie_len;
 
-		if (unparsed_len <= sizeof(struct ieee_types_header))
+		if (unparsed_len <= sizeof(struct element))
 			pvendor_ie = NULL;
 		else
-			pvendor_ie = (struct ieee_types_vendor_header *)
+			pvendor_ie = (struct ieee80211_vendor_ie *)
 				(((u8 *)pvendor_ie) + cur_ie_len);
 	}
 

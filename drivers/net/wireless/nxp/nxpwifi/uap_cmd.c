@@ -982,7 +982,7 @@ void
 nxpwifi_set_uap_rates(struct nxpwifi_uap_bss_param *bss_cfg,
 		      struct cfg80211_ap_settings *params)
 {
-	struct ieee_types_header *rate_ie;
+	struct element *rate_ie;
 	int var_offset = offsetof(struct ieee80211_mgmt, u.beacon.variable);
 	const u8 *var_pos = params->beacon.head + var_offset;
 	int len = params->beacon.head_len - var_offset;
@@ -990,19 +990,20 @@ nxpwifi_set_uap_rates(struct nxpwifi_uap_bss_param *bss_cfg,
 
 	rate_ie = (void *)cfg80211_find_ie(WLAN_EID_SUPP_RATES, var_pos, len);
 	if (rate_ie) {
-		if (rate_ie->len > NXPWIFI_SUPPORTED_RATES)
+		if (rate_ie->datalen > NXPWIFI_SUPPORTED_RATES)
 			return;
-		memcpy(bss_cfg->rates, rate_ie + 1, rate_ie->len);
-		rate_len = rate_ie->len;
+		memcpy(bss_cfg->rates, rate_ie + 1, rate_ie->datalen);
+		rate_len = rate_ie->datalen;
 	}
 
 	rate_ie = (void *)cfg80211_find_ie(WLAN_EID_EXT_SUPP_RATES,
 					   params->beacon.tail,
 					   params->beacon.tail_len);
 	if (rate_ie) {
-		if (rate_ie->len > NXPWIFI_SUPPORTED_RATES - rate_len)
+		if (rate_ie->datalen > NXPWIFI_SUPPORTED_RATES - rate_len)
 			return;
-		memcpy(bss_cfg->rates + rate_len, rate_ie + 1, rate_ie->len);
+		memcpy(bss_cfg->rates + rate_len,
+		       rate_ie + 1, rate_ie->datalen);
 	}
 }
 
@@ -1044,7 +1045,7 @@ nxpwifi_set_wmm_params(struct nxpwifi_private *priv,
 		if (*(wmm_ie + 1) > sizeof(struct nxpwifi_types_wmm_info))
 			return;
 		memcpy(&bss_cfg->wmm_info, wmm_ie +
-		       sizeof(struct ieee_types_header), *(wmm_ie + 1));
+		       sizeof(struct element), *(wmm_ie + 1));
 		priv->wmm_enabled = 1;
 	} else {
 		memset(&bss_cfg->wmm_info, 0, sizeof(bss_cfg->wmm_info));

@@ -1123,17 +1123,6 @@ struct ieee_types_cf_param_set {
 	__le16 cfp_duration_remaining;
 } __packed;
 
-struct ieee_types_ibss_param_set {
-	u8 element_id;
-	u8 len;
-	__le16 atim_window;
-} __packed;
-
-union ieee_types_ss_param_set {
-	struct ieee_types_cf_param_set cf_param_set;
-	struct ieee_types_ibss_param_set ibss_param_set;
-} __packed;
-
 struct ieee_types_fh_param_set {
 	u8 element_id;
 	u8 len;
@@ -1647,33 +1636,6 @@ struct nxpwifi_ie_types_wmm_queue_status {
 	u32 reserved;
 };
 
-struct ieee_types_vendor_header {
-	u8 element_id;
-	u8 len;
-	struct {
-		u8 oui[3];
-		u8 oui_type;
-	} __packed oui;
-} __packed;
-
-struct ieee_types_wmm_parameter {
-	/* WMM Parameter IE - Vendor Specific Header:
-	 *   element_id  [221/0xdd]
-	 *   Len         [24]
-	 *   Oui         [00:50:f2]
-	 *   OuiType     [2]
-	 *   OuiSubType  [1]
-	 *   Version     [1]
-	 */
-	struct ieee_types_vendor_header vend_hdr;
-	u8 oui_subtype;
-	u8 version;
-
-	u8 qos_info_bitmap;
-	u8 reserved;
-	struct ieee_types_wmm_ac_parameters ac_params[IEEE80211_NUM_ACS];
-} __packed;
-
 struct ieee_types_wmm_info {
 	/* WMM Info IE - Vendor Specific Header:
 	 *   element_id  [221/0xdd]
@@ -1683,7 +1645,7 @@ struct ieee_types_wmm_info {
 	 *   OuiSubType  [0]
 	 *   Version     [1]
 	 */
-	struct ieee_types_vendor_header vend_hdr;
+	struct ieee80211_vendor_ie vend_hdr;
 	u8 oui_subtype;
 	u8 version;
 
@@ -1693,7 +1655,7 @@ struct ieee_types_wmm_info {
 struct host_cmd_ds_wmm_get_status {
 	u8 queue_status_tlv[sizeof(struct nxpwifi_ie_types_wmm_queue_status) *
 			      IEEE80211_NUM_ACS];
-	u8 wmm_param_tlv[sizeof(struct ieee_types_wmm_parameter) + 2];
+	u8 wmm_param_tlv[sizeof(struct ieee80211_wmm_param_ie) + 2];
 } __packed;
 
 struct nxpwifi_wmm_ac_status {

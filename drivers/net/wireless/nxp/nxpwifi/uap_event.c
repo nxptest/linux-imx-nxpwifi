@@ -156,7 +156,7 @@ nxpwifi_check_uap_capabilities(struct nxpwifi_private *priv,
 	u8 *curr;
 	u16 tlv_len;
 	struct nxpwifi_ie_types_data *tlv_hdr;
-	struct ieee_types_wmm_parameter *wmm_param_ie = NULL;
+	struct ieee80211_wmm_param_ie *wmm_param_ie = NULL;
 	int mask = IEEE80211_WMM_IE_AP_QOSINFO_PARAM_SET_CNT_MASK;
 
 	priv->wmm_enabled = false;
@@ -190,13 +190,13 @@ nxpwifi_check_uap_capabilities(struct nxpwifi_private *priv,
 			 * and setup the IEEE IE type and length byte fields
 			 */
 			wmm_param_ie = (void *)(curr + 2);
-			wmm_param_ie->vend_hdr.len = (u8)tlv_len;
-			wmm_param_ie->vend_hdr.element_id =
+			wmm_param_ie->len = (u8)tlv_len;
+			wmm_param_ie->element_id =
 						WLAN_EID_VENDOR_SPECIFIC;
 			nxpwifi_dbg(priv->adapter, EVENT,
 				    "info: check uap capabilities:\t"
 				    "wmm parameter set count: %d\n",
-				    wmm_param_ie->qos_info_bitmap & mask);
+				    wmm_param_ie->qos_info & mask);
 
 			nxpwifi_wmm_setup_ac_downgrade(priv);
 			priv->wmm_enabled = true;

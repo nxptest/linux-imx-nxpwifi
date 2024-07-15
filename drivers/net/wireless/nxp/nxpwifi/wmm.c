@@ -69,20 +69,20 @@ static u8 ac_to_tid[4][2] = { {1, 2}, {0, 3}, {4, 5}, {6, 7} };
 /* This function debug prints the priority parameters for a WMM AC.
  */
 static void
-nxpwifi_wmm_ac_debug_print(const struct ieee_types_wmm_ac_parameters *ac_param)
+nxpwifi_wmm_ac_debug_print(const struct ieee80211_wmm_ac_param *ac_param)
 {
 	static const char * const ac_str[] = { "BK", "BE", "VI", "VO" };
 
 	pr_debug("info: WMM AC_%s: ACI=%d, ACM=%d, Aifsn=%d, ",
-		 ac_str[wmm_aci_to_qidx_map[(ac_param->aci_aifsn_bitmap
+		 ac_str[wmm_aci_to_qidx_map[(ac_param->aci_aifsn
 					     & NXPWIFI_ACI) >> 5]],
-		 (ac_param->aci_aifsn_bitmap & NXPWIFI_ACI) >> 5,
-		 (ac_param->aci_aifsn_bitmap & NXPWIFI_ACM) >> 4,
-		 ac_param->aci_aifsn_bitmap & NXPWIFI_AIFSN);
+		 (ac_param->aci_aifsn & NXPWIFI_ACI) >> 5,
+		 (ac_param->aci_aifsn & NXPWIFI_ACM) >> 4,
+		 ac_param->aci_aifsn & NXPWIFI_AIFSN);
 	pr_debug("EcwMin=%d, EcwMax=%d, TxopLimit=%d\n",
-		 ac_param->ecw_bitmap & NXPWIFI_ECW_MIN,
-		 (ac_param->ecw_bitmap & NXPWIFI_ECW_MAX) >> 4,
-		 le16_to_cpu(ac_param->tx_op_limit));
+		 ac_param->cw & NXPWIFI_ECW_MIN,
+		 (ac_param->cw & NXPWIFI_ECW_MAX) >> 4,
+		 le16_to_cpu(ac_param->txop_limit));
 }
 
 /* This function allocates a route address list.
@@ -209,7 +209,7 @@ nxpwifi_wmm_queue_priorities_tid(struct nxpwifi_private *priv)
  */
 void
 nxpwifi_wmm_setup_queue_priorities(struct nxpwifi_private *priv,
-				   struct ieee_types_wmm_parameter *wmm_ie)
+				   struct ieee80211_wmm_param_ie *wmm_ie)
 {
 	u16 cw_min, avg_back_off, tmp[4];
 	u32 i, j, num_ac;
@@ -224,13 +224,13 @@ nxpwifi_wmm_setup_queue_priorities(struct nxpwifi_private *priv,
 	nxpwifi_dbg(priv->adapter, INFO,
 		    "info: WMM Parameter IE: version=%d,\t"
 		    "qos_info Parameter Set Count=%d, Reserved=%#x\n",
-		    wmm_ie->version, wmm_ie->qos_info_bitmap &
+		    wmm_ie->version, wmm_ie->qos_info &
 		    IEEE80211_WMM_IE_AP_QOSINFO_PARAM_SET_CNT_MASK,
 		    wmm_ie->reserved);
 
-	for (num_ac = 0; num_ac < ARRAY_SIZE(wmm_ie->ac_params); num_ac++) {
-		u8 ecw = wmm_ie->ac_params[num_ac].ecw_bitmap;
-		u8 aci_aifsn = wmm_ie->ac_params[num_ac].aci_aifsn_bitmap;
+	for (num_ac = 0; num_ac < ARRAY_SIZE(wmm_ie->ac); num_ac++) {
+		u8 ecw = wmm_ie->ac[num_ac].cw;
+		u8 aci_aifsn = wmm_ie->ac[num_ac].aci_aifsn;
 
 		cw_min = (1 << (ecw & NXPWIFI_ECW_MIN)) - 1;
 		avg_back_off = (cw_min >> 1) + (aci_aifsn & NXPWIFI_AIFSN);
@@ -243,7 +243,7 @@ nxpwifi_wmm_setup_queue_priorities(struct nxpwifi_private *priv,
 			    "info: WMM: CWmax=%d CWmin=%d Avg Back-off=%d\n",
 			    (1 << ((ecw & NXPWIFI_ECW_MAX) >> 4)) - 1,
 			    cw_min, avg_back_off);
-		nxpwifi_wmm_ac_debug_print(&wmm_ie->ac_params[num_ac]);
+		nxpwifi_wmm_ac_debug_print(&wmm_ie->ac[num_ac]);
 	}
 
 	/* Bubble sort */
@@ -797,7 +797,7 @@ int nxpwifi_ret_wmm_get_status(struct nxpwifi_private *priv,
 
 	struct nxpwifi_ie_types_data *tlv_hdr;
 	struct nxpwifi_ie_types_wmm_queue_status *wmm_qs;
-	struct ieee_types_wmm_parameter *wmm_param_ie = NULL;
+	struct ieee80211_wmm_param_ie *wmm_param_ie = NULL;
 	struct nxpwifi_wmm_ac_status *ac_status;
 
 	nxpwifi_dbg(priv->adapter, INFO,
@@ -834,22 +834,21 @@ int nxpwifi_ret_wmm_get_status(struct nxpwifi_private *priv,
 			 */
 
 			wmm_param_ie =
-				(struct ieee_types_wmm_parameter *)(curr + 2);
-			wmm_param_ie->vend_hdr.len = (u8)tlv_len;
-			wmm_param_ie->vend_hdr.element_id =
-						WLAN_EID_VENDOR_SPECIFIC;
+				(struct ieee80211_wmm_param_ie *)(curr + 2);
+			wmm_param_ie->len = (u8)tlv_len;
+			wmm_param_ie->element_id = WLAN_EID_VENDOR_SPECIFIC;
 
 			nxpwifi_dbg(priv->adapter, CMD,
 				    "info: CMD_RESP: WMM_GET_STATUS:\t"
 				    "WMM Parameter Set Count: %d\n",
-				    wmm_param_ie->qos_info_bitmap & mask);
+				    wmm_param_ie->qos_info & mask);
 
-			if (wmm_param_ie->vend_hdr.len + 2 >
-				sizeof(struct ieee_types_wmm_parameter))
+			if (wmm_param_ie->len + 2 >
+				sizeof(struct ieee80211_wmm_param_ie))
 				break;
 
 			memcpy(&priv->curr_bss_params.bss_descriptor.wmm_ie,
-			       wmm_param_ie, wmm_param_ie->vend_hdr.len + 2);
+			       wmm_param_ie, wmm_param_ie->len + 2);
 
 			break;
 
@@ -877,7 +876,7 @@ int nxpwifi_ret_wmm_get_status(struct nxpwifi_private *priv,
 u32
 nxpwifi_wmm_process_association_req(struct nxpwifi_private *priv,
 				    u8 **assoc_buf,
-				    struct ieee_types_wmm_parameter *wmm_ie,
+				    struct ieee80211_wmm_param_ie *wmm_ie,
 				    struct ieee80211_ht_cap *ht_cap)
 {
 	struct nxpwifi_ie_types_wmm_param_set *wmm_tlv;
@@ -894,18 +893,18 @@ nxpwifi_wmm_process_association_req(struct nxpwifi_private *priv,
 
 	nxpwifi_dbg(priv->adapter, INFO,
 		    "info: WMM: process assoc req: bss->wmm_ie=%#x\n",
-		    wmm_ie->vend_hdr.element_id);
+		    wmm_ie->element_id);
 
 	if ((priv->wmm_required ||
 	     (ht_cap && (priv->adapter->config_bands & BAND_GN ||
 	     priv->adapter->config_bands & BAND_AN))) &&
-	    wmm_ie->vend_hdr.element_id == WLAN_EID_VENDOR_SPECIFIC) {
+	    wmm_ie->element_id == WLAN_EID_VENDOR_SPECIFIC) {
 		wmm_tlv = (struct nxpwifi_ie_types_wmm_param_set *)*assoc_buf;
 		wmm_tlv->header.type = cpu_to_le16((u16)wmm_info_ie[0]);
 		wmm_tlv->header.len = cpu_to_le16((u16)wmm_info_ie[1]);
 		memcpy(wmm_tlv->wmm_ie, &wmm_info_ie[2],
 		       le16_to_cpu(wmm_tlv->header.len));
-		if (wmm_ie->qos_info_bitmap & IEEE80211_WMM_IE_AP_QOSINFO_UAPSD)
+		if (wmm_ie->qos_info & IEEE80211_WMM_IE_AP_QOSINFO_UAPSD)
 			memcpy((u8 *)(wmm_tlv->wmm_ie
 				      + le16_to_cpu(wmm_tlv->header.len)
 				      - sizeof(priv->wmm_qosinfo)),

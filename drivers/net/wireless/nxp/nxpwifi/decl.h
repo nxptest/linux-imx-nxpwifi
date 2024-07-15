@@ -188,19 +188,13 @@ enum nxpwifi_wmm_ac_e {
 	WMM_AC_VO
 } __packed;
 
-struct ieee_types_wmm_ac_parameters {
-	u8 aci_aifsn_bitmap;
-	u8 ecw_bitmap;
-	__le16 tx_op_limit;
-} __packed;
-
 struct nxpwifi_types_wmm_info {
 	u8 oui[4];
 	u8 subtype;
 	u8 version;
 	u8 qos_info;
 	u8 reserved;
-	struct ieee_types_wmm_ac_parameters ac_params[IEEE80211_NUM_ACS];
+	struct ieee80211_wmm_ac_param ac[IEEE80211_NUM_ACS];
 } __packed;
 
 struct nxpwifi_arp_eth_header {

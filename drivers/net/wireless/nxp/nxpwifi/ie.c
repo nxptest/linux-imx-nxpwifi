@@ -214,7 +214,7 @@ static int nxpwifi_update_vs_ie(const u8 *ies, int ies_len,
 				struct nxpwifi_ie **ie_ptr, u16 mask,
 				unsigned int oui, u8 oui_type)
 {
-	struct ieee_types_header *vs_ie;
+	struct element *vs_ie;
 	struct nxpwifi_ie *ie = *ie_ptr;
 	const u8 *vendor_ie;
 
@@ -227,13 +227,13 @@ static int nxpwifi_update_vs_ie(const u8 *ies, int ies_len,
 			ie = *ie_ptr;
 		}
 
-		vs_ie = (struct ieee_types_header *)vendor_ie;
-		if (le16_to_cpu(ie->ie_length) + vs_ie->len + 2 >
+		vs_ie = (struct element *)vendor_ie;
+		if (le16_to_cpu(ie->ie_length) + vs_ie->datalen + 2 >
 			IEEE_MAX_IE_SIZE)
 			return -EINVAL;
 		memcpy(ie->ie_buffer + le16_to_cpu(ie->ie_length),
-		       vs_ie, vs_ie->len + 2);
-		le16_unaligned_add_cpu(&ie->ie_length, vs_ie->len + 2);
+		       vs_ie, vs_ie->datalen + 2);
+		le16_unaligned_add_cpu(&ie->ie_length, vs_ie->datalen + 2);
 		ie->mgmt_subtype_mask = cpu_to_le16(mask);
 		ie->ie_index = cpu_to_le16(NXPWIFI_AUTO_IDX_MASK);
 	}
@@ -315,7 +315,7 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 				      struct cfg80211_beacon_data *info)
 {
 	struct nxpwifi_ie *gen_ie;
-	struct ieee_types_header *hdr;
+	struct element *hdr;
 	struct ieee80211_vendor_ie *vendorhdr;
 	u16 gen_idx = NXPWIFI_AUTO_IDX_MASK, ie_len = 0;
 	int left_len, parsed_len = 0;
@@ -334,15 +334,15 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 	/* Many IEs are generated in FW by parsing bss configuration.
 	 * Let's not add them here; else we may end up duplicating these IEs
 	 */
-	while (left_len > sizeof(struct ieee_types_header)) {
+	while (left_len > sizeof(struct element)) {
 		hdr = (void *)(info->tail + parsed_len);
-		token_len = hdr->len + sizeof(struct ieee_types_header);
+		token_len = hdr->datalen + sizeof(struct element);
 		if (token_len > left_len) {
 			ret = -EINVAL;
 			goto done;
 		}
 
-		switch (hdr->element_id) {
+		switch (hdr->id) {
 		case WLAN_EID_SSID:
 		case WLAN_EID_SUPP_RATES:
 		case WLAN_EID_COUNTRY:
@@ -382,7 +382,7 @@ static int nxpwifi_uap_parse_tail_ies(struct nxpwifi_private *priv,
 						    WLAN_OUI_TYPE_MICROSOFT_WPA,
 						    info->tail, info->tail_len);
 	if (vendorhdr) {
-		token_len = vendorhdr->len + sizeof(struct ieee_types_header);
+		token_len = vendorhdr->len + sizeof(struct element);
 		if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
 			ret = -EINVAL;
 			goto done;

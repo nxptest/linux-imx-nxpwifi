@@ -413,7 +413,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 	if (priv->sec_info.authentication_mode == WLAN_AUTH_SAE) {
 		auth_tlv->auth_type = cpu_to_le16(NXPWIFI_AUTHTYPE_SAE);
 		if (bss_desc->bcn_rsnx_ie &&
-		    bss_desc->bcn_rsnx_ie->ieee_hdr.len &&
+		    bss_desc->bcn_rsnx_ie->datalen &&
 		    (bss_desc->bcn_rsnx_ie->data[0] &
 		     WLAN_RSNX_CAPA_SAE_H2E)) {
 			sae_pwe_tlv =
@@ -684,7 +684,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 
 	priv->curr_bss_params.band = (u8)bss_desc->bss_band;
 
-	if (bss_desc->wmm_ie.vend_hdr.element_id == WLAN_EID_VENDOR_SPECIFIC)
+	if (bss_desc->wmm_ie.element_id == WLAN_EID_VENDOR_SPECIFIC)
 		priv->curr_bss_params.wmm_enabled = true;
 	else
 		priv->curr_bss_params.wmm_enabled = false;
@@ -699,7 +699,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 
 	if (priv->wmm_enabled)
 		priv->curr_bss_params.wmm_uapsd_enabled =
-			((bss_desc->wmm_ie.qos_info_bitmap &
+			((bss_desc->wmm_ie.qos_info &
 			  IEEE80211_WMM_IE_AP_QOSINFO_UAPSD) ? 1 : 0);
 
 	/* Store the bandwidth information from assoc response */
@@ -708,7 +708,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 				  - sizeof(struct ieee_types_assoc_rsp));
 	if (ie_ptr) {
 		assoc_resp_ht_oper = (struct ieee80211_ht_operation *)(ie_ptr
-					+ sizeof(struct ieee_types_header));
+					+ sizeof(struct element));
 		priv->assoc_resp_ht_param = assoc_resp_ht_oper->ht_param;
 		priv->ht_param_present = true;
 	} else {

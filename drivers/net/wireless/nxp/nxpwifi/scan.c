@@ -78,7 +78,7 @@ _dbg_security_flags(int log_level, const char *func, const char *desc,
 		     bss_desc->bcn_wpa_ie ?
 		     bss_desc->bcn_wpa_ie->vend_hdr.element_id : 0,
 		     bss_desc->bcn_rsn_ie ?
-		     bss_desc->bcn_rsn_ie->ieee_hdr.element_id : 0,
+		     bss_desc->bcn_rsn_ie->id : 0,
 		     priv->sec_info.wep_enabled ? "e" : "d",
 		     priv->sec_info.wpa_enabled ? "e" : "d",
 		     priv->sec_info.wpa2_enabled ? "e" : "d",
@@ -90,9 +90,9 @@ _dbg_security_flags(int log_level, const char *func, const char *desc,
 	_dbg_security_flags(NXPWIFI_DBG_##mask, desc, __func__, priv, bss_desc)
 
 static bool
-has_ieee_hdr(struct ieee_types_generic *ie, u8 key)
+has_ieee_hdr(struct element *ie, u8 key)
 {
-	return (ie && ie->ieee_hdr.element_id == key);
+	return (ie && ie->id == key);
 }
 
 static bool
@@ -1130,7 +1130,6 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 	struct ieee_types_fh_param_set *fh_param_set;
 	struct ieee_types_ds_param_set *ds_param_set;
 	struct ieee_types_cf_param_set *cf_param_set;
-	struct ieee_types_ibss_param_set *ibss_param_set;
 	u8 *current_ptr;
 	u8 *rate;
 	u8 element_len;
@@ -1152,7 +1151,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 	while (bytes_left >= 2) {
 		element_id = *current_ptr;
 		element_len = *(current_ptr + 1);
-		total_ie_len = element_len + sizeof(struct ieee_types_header);
+		total_ie_len = element_len + sizeof(struct element);
 
 		if (bytes_left < total_ie_len) {
 			nxpwifi_dbg(adapter, ERROR,
@@ -1211,20 +1210,9 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 				return -EINVAL;
 			cf_param_set =
 				(struct ieee_types_cf_param_set *)current_ptr;
-			memcpy(&bss_entry->ss_param_set.cf_param_set,
+			memcpy(&bss_entry->cf_param_set,
 			       cf_param_set,
 			       sizeof(struct ieee_types_cf_param_set));
-			break;
-
-		case WLAN_EID_IBSS_PARAMS:
-			if (total_ie_len < sizeof(*ibss_param_set))
-				return -EINVAL;
-			ibss_param_set =
-				(struct ieee_types_ibss_param_set *)
-				current_ptr;
-			memcpy(&bss_entry->ss_param_set.ibss_param_set,
-			       ibss_param_set,
-			       sizeof(struct ieee_types_ibss_param_set));
 			break;
 
 		case WLAN_EID_ERP_INFO:
@@ -1279,7 +1267,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 					current_ptr;
 
 			/* 802.11 requires at least 3-byte OUI. */
-			if (element_len < sizeof(vendor_ie->vend_hdr.oui.oui))
+			if (element_len < sizeof(vendor_ie->vend_hdr.oui))
 				return -EINVAL;
 
 			/* Not long enough for a match? Skip it. */
@@ -1296,7 +1284,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 			} else if (!memcmp(&vendor_ie->vend_hdr.oui, wmm_oui,
 				    sizeof(wmm_oui))) {
 				if (total_ie_len ==
-				    sizeof(struct ieee_types_wmm_parameter) ||
+				    sizeof(struct ieee80211_wmm_param_ie) ||
 				    total_ie_len ==
 				    sizeof(struct ieee_types_wmm_info))
 					/* Only accept and copy the WMM IE if
@@ -1309,37 +1297,37 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 			break;
 		case WLAN_EID_RSN:
 			bss_entry->bcn_rsn_ie =
-				(struct ieee_types_generic *)current_ptr;
-			bss_entry->rsn_offset = (u16)(current_ptr -
-						      bss_entry->beacon_buf);
+				(struct element *)current_ptr;
+			bss_entry->rsn_offset =
+				(u16)(current_ptr - bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_RSNX:
 			bss_entry->bcn_rsnx_ie =
-				(struct ieee_types_generic *)current_ptr;
+				(struct element *)current_ptr;
 			bss_entry->rsnx_offset =
 				(u16)(current_ptr - bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_HT_CAPABILITY:
 			bss_entry->bcn_ht_cap = (struct ieee80211_ht_cap *)
 					(current_ptr +
-					sizeof(struct ieee_types_header));
+					sizeof(struct element));
 			bss_entry->ht_cap_offset = (u16)(current_ptr +
-					sizeof(struct ieee_types_header) -
+					sizeof(struct element) -
 					bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_HT_OPERATION:
 			bss_entry->bcn_ht_oper =
 				(struct ieee80211_ht_operation *)(current_ptr +
-					sizeof(struct ieee_types_header));
+					sizeof(struct element));
 			bss_entry->ht_info_offset = (u16)(current_ptr +
-					sizeof(struct ieee_types_header) -
+					sizeof(struct element) -
 					bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_VHT_CAPABILITY:
 			bss_entry->disable_11ac = false;
 			bss_entry->bcn_vht_cap =
 				(void *)(current_ptr +
-					 sizeof(struct ieee_types_header));
+					 sizeof(struct element));
 			bss_entry->vht_cap_offset =
 					(u16)((u8 *)bss_entry->bcn_vht_cap -
 					      bss_entry->beacon_buf);
@@ -1347,7 +1335,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 		case WLAN_EID_VHT_OPERATION:
 			bss_entry->bcn_vht_oper =
 				(void *)(current_ptr +
-					 sizeof(struct ieee_types_header));
+					 sizeof(struct element));
 			bss_entry->vht_info_offset =
 					(u16)((u8 *)bss_entry->bcn_vht_oper -
 					      bss_entry->beacon_buf);
@@ -1747,26 +1735,26 @@ nxpwifi_parse_single_response_buf(struct nxpwifi_private *priv, u8 **bss_info,
 		    "info: InterpretIE: IELength for this AP = %d\n",
 		    curr_bcn_bytes);
 
-	while (curr_bcn_bytes >= sizeof(struct ieee_types_header)) {
+	while (curr_bcn_bytes >= sizeof(struct element)) {
 		u8 element_id, element_len;
 
 		element_id = *current_ptr;
 		element_len = *(current_ptr + 1);
 		if (curr_bcn_bytes < element_len +
-				sizeof(struct ieee_types_header)) {
+				sizeof(struct element)) {
 			nxpwifi_dbg(adapter, ERROR,
 				    "%s: bytes left < IE length\n", __func__);
 			return -EFAULT;
 		}
 		if (element_id == WLAN_EID_DS_PARAMS) {
 			channel = *(current_ptr +
-				    sizeof(struct ieee_types_header));
+				    sizeof(struct element));
 			break;
 		}
 
-		current_ptr += element_len + sizeof(struct ieee_types_header);
+		current_ptr += element_len + sizeof(struct element);
 		curr_bcn_bytes -= element_len +
-					sizeof(struct ieee_types_header);
+					sizeof(struct element);
 	}
 
 	if (channel) {
@@ -2842,9 +2830,9 @@ nxpwifi_save_curr_bcn(struct nxpwifi_private *priv)
 			 curr_bss->wpa_offset);
 
 	if (curr_bss->bcn_rsn_ie)
-		curr_bss->bcn_rsn_ie = (struct ieee_types_generic *)
-			(curr_bss->beacon_buf +
-			 curr_bss->rsn_offset);
+		curr_bss->bcn_rsn_ie =
+			(struct element *)(curr_bss->beacon_buf +
+					   curr_bss->rsn_offset);
 
 	if (curr_bss->bcn_ht_cap)
 		curr_bss->bcn_ht_cap = (struct ieee80211_ht_cap *)

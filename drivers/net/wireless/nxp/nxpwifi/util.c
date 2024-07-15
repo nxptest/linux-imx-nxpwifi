@@ -610,7 +610,7 @@ void
 nxpwifi_set_sta_ht_cap(struct nxpwifi_private *priv, const u8 *ies,
 		       int ies_len, struct nxpwifi_sta_node *node)
 {
-	struct ieee_types_header *ht_cap_ie;
+	struct element *ht_cap_ie;
 	const struct ieee80211_ht_cap *ht_cap;
 
 	if (!ies)
@@ -825,7 +825,7 @@ int nxpwifi_download_vdll_block(struct nxpwifi_adapter *adapter,
 
 	if (ret)
 		nxpwifi_dbg(adapter, ERROR,
-			    "Fail to download VDLL: block: %#x, len: %d\n",
+			    "Fail to download VDLL: block: %p, len: %d\n",
 			    block, block_len);
 
 	return ret;

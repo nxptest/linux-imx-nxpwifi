@@ -58,11 +58,11 @@ void nxpwifi_wmm_init(struct nxpwifi_adapter *adapter);
 
 u32 nxpwifi_wmm_process_association_req(struct nxpwifi_private *priv,
 					u8 **assoc_buf,
-					struct ieee_types_wmm_parameter *wmmie,
+					struct ieee80211_wmm_param_ie *wmmie,
 					struct ieee80211_ht_cap *htcap);
 
 void nxpwifi_wmm_setup_queue_priorities(struct nxpwifi_private *priv,
-					struct ieee_types_wmm_parameter *wmm_ie);
+					struct ieee80211_wmm_param_ie *wmm_ie);
 void nxpwifi_wmm_setup_ac_downgrade(struct nxpwifi_private *priv);
 int nxpwifi_ret_wmm_get_status(struct nxpwifi_private *priv,
 			       const struct host_cmd_ds_command *resp);

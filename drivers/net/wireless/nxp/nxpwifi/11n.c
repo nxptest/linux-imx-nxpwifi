@@ -309,7 +309,7 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 	struct nxpwifi_ie_types_extcap *ext_cap;
 	int ret_len = 0;
 	struct ieee80211_supported_band *sband;
-	struct ieee_types_header *hdr;
+	struct element *hdr;
 	u8 radio_type;
 
 	if (!buffer || !*buffer)
@@ -401,7 +401,7 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 		memcpy((u8 *)bss_co_2040 +
 		       sizeof(struct nxpwifi_ie_types_header),
 		       bss_desc->bcn_bss_co_2040 +
-		       sizeof(struct ieee_types_header),
+		       sizeof(struct element),
 		       le16_to_cpu(bss_co_2040->header.len));
 
 		*buffer += sizeof(struct nxpwifi_ie_types_2040bssco);
@@ -413,20 +413,20 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 		ext_cap = (struct nxpwifi_ie_types_extcap *)*buffer;
 		memset(ext_cap, 0, sizeof(struct nxpwifi_ie_types_extcap));
 		ext_cap->header.type = cpu_to_le16(WLAN_EID_EXT_CAPABILITY);
-		ext_cap->header.len = cpu_to_le16(hdr->len);
+		ext_cap->header.len = cpu_to_le16(hdr->datalen);
 
 		memcpy((u8 *)ext_cap->ext_capab,
-		       bss_desc->bcn_ext_cap + sizeof(struct ieee_types_header),
+		       bss_desc->bcn_ext_cap + sizeof(struct element),
 		       le16_to_cpu(ext_cap->header.len));
 
-		if (hdr->len > 3 &&
+		if (hdr->datalen > 3 &&
 		    ext_cap->ext_capab[3] & WLAN_EXT_CAPA4_INTERWORKING_ENABLED)
 			priv->hs2_enabled = true;
 		else
 			priv->hs2_enabled = false;
 
-		*buffer += sizeof(struct nxpwifi_ie_types_extcap) + hdr->len;
-		ret_len += sizeof(struct nxpwifi_ie_types_extcap) + hdr->len;
+		*buffer += sizeof(struct nxpwifi_ie_types_extcap) + hdr->datalen;
+		ret_len += sizeof(struct nxpwifi_ie_types_extcap) + hdr->datalen;
 	}
 
 	return ret_len;
