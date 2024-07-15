@@ -580,8 +580,6 @@ struct nxpwifi_private {
 	struct dentry *dfs_dev_dir;
 #endif
 	u16 current_key_index;
-	/* mutex for scan */
-	struct mutex async_mutex;
 	struct cfg80211_scan_request *scan_request;
 	u8 cfg_bssid[6];
 	struct wps wps;
@@ -1326,8 +1324,7 @@ int nxpwifi_cancel_hs(struct nxpwifi_private *priv, int cmd_type);
 bool nxpwifi_enable_hs(struct nxpwifi_adapter *adapter);
 int nxpwifi_disable_auto_ds(struct nxpwifi_private *priv);
 int nxpwifi_drv_get_data_rate(struct nxpwifi_private *priv, u32 *rate);
-int nxpwifi_request_scan(struct nxpwifi_private *priv,
-			 struct cfg80211_ssid *req_ssid);
+
 int nxpwifi_scan_networks(struct nxpwifi_private *priv,
 			  const struct nxpwifi_user_scan_cfg *user_scan_in);
 int nxpwifi_set_radio(struct nxpwifi_private *priv, u8 option);

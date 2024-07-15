@@ -2363,8 +2363,6 @@ struct wireless_dev *nxpwifi_add_virtual_intf(struct wiphy *wiphy,
 	INIT_DELAYED_WORK(&priv->dfs_chan_sw_work,
 			  nxpwifi_dfs_chan_sw_work_queue);
 
-	mutex_init(&priv->async_mutex);
-
 	/* Register network device */
 	if (cfg80211_register_netdevice(dev)) {
 		nxpwifi_dbg(adapter, ERROR, "cannot register network device\n");

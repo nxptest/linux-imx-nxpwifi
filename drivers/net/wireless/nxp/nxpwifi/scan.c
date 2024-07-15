@@ -2706,40 +2706,6 @@ static int nxpwifi_scan_specific_ssid(struct nxpwifi_private *priv,
 	return ret;
 }
 
-/* Sends IOCTL request to start a scan.
- *
- * This function allocates the IOCTL request buffer, fills it
- * with requisite parameters and calls the IOCTL handler.
- *
- * Scan command can be issued for both normal scan and specific SSID
- * scan, depending upon whether an SSID is provided or not.
- */
-int nxpwifi_request_scan(struct nxpwifi_private *priv,
-			 struct cfg80211_ssid *req_ssid)
-{
-	int ret;
-
-	if (mutex_lock_interruptible(&priv->async_mutex)) {
-		nxpwifi_dbg(priv->adapter, ERROR,
-			    "%s: acquire semaphore fail\n",
-			    __func__);
-		return -EPERM;
-	}
-
-	priv->adapter->scan_wait_q_woken = false;
-
-	if (req_ssid && req_ssid->ssid_len != 0)
-		/* Specific SSID scan */
-		ret = nxpwifi_scan_specific_ssid(priv, req_ssid);
-	else
-		/* Normal scan */
-		ret = nxpwifi_scan_networks(priv, NULL);
-
-	mutex_unlock(&priv->async_mutex);
-
-	return ret;
-}
-
 /* This function appends the vendor specific IE TLV to a buffer.
  */
 int
