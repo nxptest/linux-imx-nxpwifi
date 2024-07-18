@@ -613,9 +613,7 @@ struct nxpwifi_private {
 	/** rx histogram data */
 	struct nxpwifi_histogram_data *hist_data;
 	struct cfg80211_chan_def dfs_chandef;
-	struct workqueue_struct *dfs_cac_workqueue;
 	struct delayed_work dfs_cac_work;
-	struct workqueue_struct *dfs_chan_sw_workqueue;
 	struct delayed_work dfs_chan_sw_work;
 	bool uap_stop_tx;
 	struct cfg80211_beacon_data beacon_after;
@@ -806,7 +804,6 @@ struct nxpwifi_adapter {
 	struct work_struct main_work;
 	struct workqueue_struct *rx_workqueue;
 	struct work_struct rx_work;
-	struct workqueue_struct *host_mlme_workqueue;
 	struct work_struct host_mlme_work;
 	bool rx_work_enabled;
 	bool rx_processing;
@@ -1435,8 +1432,8 @@ void nxpwifi_parse_tx_status_event(struct nxpwifi_private *priv,
 struct sk_buff *
 nxpwifi_clone_skb_for_tx_status(struct nxpwifi_private *priv,
 				struct sk_buff *skb, u8 flag, u64 *cookie);
-void nxpwifi_dfs_cac_work_queue(struct work_struct *work);
-void nxpwifi_dfs_chan_sw_work_queue(struct work_struct *work);
+void nxpwifi_dfs_cac_work(struct work_struct *work);
+void nxpwifi_dfs_chan_sw_work(struct work_struct *work);
 void nxpwifi_abort_cac(struct nxpwifi_private *priv);
 int nxpwifi_stop_radar_detection(struct nxpwifi_private *priv,
 				 struct cfg80211_chan_def *chandef);
@@ -1456,7 +1453,6 @@ void nxpwifi_prepare_fw_dump_info(struct nxpwifi_adapter *adapter);
 void nxpwifi_upload_device_dump(struct nxpwifi_adapter *adapter);
 void *nxpwifi_alloc_dma_align_buf(int rx_len, gfp_t flags);
 void nxpwifi_fw_dump_event(struct nxpwifi_private *priv);
-void nxpwifi_queue_main_work(struct nxpwifi_adapter *adapter);
 int nxpwifi_get_wakeup_reason(struct nxpwifi_private *priv, u16 action,
 			      int cmd_type,
 			      struct nxpwifi_ds_wakeup_reason *wakeup_reason);

@@ -96,7 +96,7 @@ nxpwifi_uap_queue_bridged_pkt(struct nxpwifi_private *priv,
 
 	if ((atomic_read(&adapter->pending_bridged_pkts) >=
 					     NXPWIFI_BRIDGED_PKTS_THR_HIGH)) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "Tx: Bridge packet limit reached. Drop packet!\n");
 		kfree_skb(skb);
 		nxpwifi_uap_cleanup_tx_queues(priv);
@@ -153,14 +153,14 @@ nxpwifi_uap_queue_bridged_pkt(struct nxpwifi_private *priv,
 	skb_pull(skb, hdr_chop);
 
 	if (skb_headroom(skb) < NXPWIFI_MIN_DATA_HEADER_LEN) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "data: Tx: insufficient skb headroom %d\n",
 			    skb_headroom(skb));
 		/* Insufficient skb headroom - allocate a new skb */
 		new_skb =
 			skb_realloc_headroom(skb, NXPWIFI_MIN_DATA_HEADER_LEN);
 		if (unlikely(!new_skb)) {
-			nxpwifi_dbg(priv->adapter, ERROR,
+			nxpwifi_dbg(adapter, ERROR,
 				    "Tx: cannot allocate new_skb\n");
 			kfree_skb(skb);
 			priv->stats.tx_dropped++;
@@ -169,7 +169,7 @@ nxpwifi_uap_queue_bridged_pkt(struct nxpwifi_private *priv,
 
 		kfree_skb(skb);
 		skb = new_skb;
-		nxpwifi_dbg(priv->adapter, INFO,
+		nxpwifi_dbg(adapter, INFO,
 			    "info: new skb headroom %d\n",
 			    skb_headroom(skb));
 	}
@@ -210,7 +210,7 @@ nxpwifi_uap_queue_bridged_pkt(struct nxpwifi_private *priv,
 	atomic_inc(&adapter->tx_pending);
 	atomic_inc(&adapter->pending_bridged_pkts);
 
-	nxpwifi_queue_main_work(priv->adapter);
+	nxpwifi_queue_work(adapter, &adapter->main_work);
 }
 
 /* This function contains logic for AP packet forwarding.
@@ -317,7 +317,7 @@ int nxpwifi_uap_recv_packet(struct nxpwifi_private *priv,
 			nxpwifi_dbg(adapter, ERROR, "failed to allocate skb_uap");
 		}
 
-		nxpwifi_queue_main_work(adapter);
+		nxpwifi_queue_work(adapter, &adapter->main_work);
 		/* Don't forward Intra-BSS unicast packet to upper layer*/
 		if (nxpwifi_get_sta_entry(priv, p_ethhdr->h_dest))
 			return 0;

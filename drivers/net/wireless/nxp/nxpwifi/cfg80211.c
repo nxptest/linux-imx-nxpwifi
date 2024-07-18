@@ -2339,29 +2339,9 @@ struct wireless_dev *nxpwifi_add_virtual_intf(struct wiphy *wiphy,
 
 	SET_NETDEV_DEV(dev, adapter->dev);
 
-	priv->dfs_cac_workqueue = alloc_workqueue("NXPWIFI_DFS_CAC%s",
-						  WQ_HIGHPRI |
-						  WQ_MEM_RECLAIM |
-						  WQ_UNBOUND, 0, name);
-	if (!priv->dfs_cac_workqueue) {
-		nxpwifi_dbg(adapter, ERROR, "cannot alloc DFS CAC queue\n");
-		ret = -ENOMEM;
-		goto err_alloc_cac;
-	}
+	INIT_DELAYED_WORK(&priv->dfs_cac_work, nxpwifi_dfs_cac_work);
 
-	INIT_DELAYED_WORK(&priv->dfs_cac_work, nxpwifi_dfs_cac_work_queue);
-
-	priv->dfs_chan_sw_workqueue = alloc_workqueue("NXPWIFI_DFS_CHSW%s",
-						      WQ_HIGHPRI | WQ_UNBOUND |
-						      WQ_MEM_RECLAIM, 0, name);
-	if (!priv->dfs_chan_sw_workqueue) {
-		nxpwifi_dbg(adapter, ERROR, "cannot alloc DFS channel sw queue\n");
-		ret = -ENOMEM;
-		goto err_alloc_chsw;
-	}
-
-	INIT_DELAYED_WORK(&priv->dfs_chan_sw_work,
-			  nxpwifi_dfs_chan_sw_work_queue);
+	INIT_DELAYED_WORK(&priv->dfs_chan_sw_work, nxpwifi_dfs_chan_sw_work);
 
 	/* Register network device */
 	if (cfg80211_register_netdevice(dev)) {
@@ -2382,11 +2362,7 @@ struct wireless_dev *nxpwifi_add_virtual_intf(struct wiphy *wiphy,
 	return &priv->wdev;
 
 err_reg_netdev:
-	destroy_workqueue(priv->dfs_chan_sw_workqueue);
-	priv->dfs_chan_sw_workqueue = NULL;
 err_alloc_chsw:
-	destroy_workqueue(priv->dfs_cac_workqueue);
-	priv->dfs_cac_workqueue = NULL;
 err_alloc_cac:
 	free_netdev(dev);
 	priv->netdev = NULL;
@@ -2428,15 +2404,6 @@ int nxpwifi_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	if (wdev->netdev->reg_state == NETREG_REGISTERED)
 		cfg80211_unregister_netdevice(wdev->netdev);
 
-	if (priv->dfs_cac_workqueue) {
-		destroy_workqueue(priv->dfs_cac_workqueue);
-		priv->dfs_cac_workqueue = NULL;
-	}
-
-	if (priv->dfs_chan_sw_workqueue) {
-		destroy_workqueue(priv->dfs_chan_sw_workqueue);
-		priv->dfs_chan_sw_workqueue = NULL;
-	}
 	/* Clear the priv in adapter */
 	priv->netdev = NULL;
 
@@ -3030,8 +2997,8 @@ nxpwifi_cfg80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	       sizeof(priv->beacon_after));
 
 	chsw_msec = max(params->count * priv->bss_cfg.beacon_period, 100);
-	queue_delayed_work(priv->dfs_chan_sw_workqueue, &priv->dfs_chan_sw_work,
-			   msecs_to_jiffies(chsw_msec));
+	nxpwifi_queue_delayed_work(priv->adapter, &priv->dfs_chan_sw_work,
+				   msecs_to_jiffies(chsw_msec));
 
 done:
 	return ret;
@@ -3193,9 +3160,9 @@ nxpwifi_cfg80211_start_radar_detection(struct wiphy *wiphy,
 	ret = nxpwifi_send_cmd(priv, HOST_CMD_CHAN_REPORT_REQUEST,
 			       HOST_ACT_GEN_SET, 0, &radar_params, true);
 	if (!ret)
-		queue_delayed_work(priv->dfs_cac_workqueue,
-				   &priv->dfs_cac_work,
-				   msecs_to_jiffies(cac_time_ms));
+		nxpwifi_queue_delayed_work(priv->adapter,
+					   &priv->dfs_cac_work,
+					   msecs_to_jiffies(cac_time_ms));
 
 	return ret;
 }
@@ -3483,8 +3450,8 @@ nxpwifi_cfg80211_associate(struct wiphy *wiphy, struct net_device *dev,
 		if (priv->assoc_rsp_size) {
 			priv->req_bss = req->bss;
 			adapter->assoc_resp_received = true;
-			queue_work(adapter->host_mlme_workqueue,
-				   &adapter->host_mlme_work);
+			nxpwifi_queue_work(adapter,
+					   &adapter->host_mlme_work);
 		}
 	}
 

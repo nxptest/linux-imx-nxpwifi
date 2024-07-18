@@ -98,4 +98,11 @@ int nxpwifi_process_vdll_event(struct nxpwifi_private *priv,
 
 u64 nxpwifi_roc_cookie(struct nxpwifi_adapter *adapter);
 
+void nxpwifi_queue_work(struct nxpwifi_adapter *adapter,
+			struct work_struct *work);
+
+void nxpwifi_queue_delayed_work(struct nxpwifi_adapter *adapter,
+				struct delayed_work *dwork,
+				unsigned long delay);
+
 #endif /* !_NXPWIFI_UTIL_H_ */

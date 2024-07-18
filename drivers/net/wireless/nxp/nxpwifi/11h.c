@@ -108,11 +108,11 @@ void nxpwifi_11h_process_join(struct nxpwifi_private *priv, u8 **buffer,
 	}
 }
 
-/* This is DFS CAC work queue function.
+/* This is DFS CAC work function.
  * This delayed work emits CAC finished event for cfg80211 if
  * CAC was started earlier.
  */
-void nxpwifi_dfs_cac_work_queue(struct work_struct *work)
+void nxpwifi_dfs_cac_work(struct work_struct *work)
 {
 	struct cfg80211_chan_def chandef;
 	struct delayed_work *delayed_work = to_delayed_work(work);
@@ -370,12 +370,12 @@ int nxpwifi_11h_handle_radar_detected(struct nxpwifi_private *priv,
 	return 0;
 }
 
-/* This is work queue function for channel switch handling.
+/* This is work function for channel switch handling.
  * This function takes care of updating new channel definitin to
  * bss config structure, restart AP and indicate channel switch success
  * to cfg80211.
  */
-void nxpwifi_dfs_chan_sw_work_queue(struct work_struct *work)
+void nxpwifi_dfs_chan_sw_work(struct work_struct *work)
 {
 	struct nxpwifi_uap_bss_param *bss_cfg;
 	struct delayed_work *delayed_work = to_delayed_work(work);

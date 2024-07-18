@@ -541,7 +541,7 @@ static void nxpwifi_sdio_coredump(struct device *dev)
 	card = sdio_get_drvdata(func);
 	if (!test_and_set_bit(NXPWIFI_IFACE_WORK_DEVICE_DUMP,
 			      &card->work_flags))
-		schedule_work(&card->work);
+		nxpwifi_queue_work(card->adapter, &card->work);
 }
 
 /* WLAN IDs */
@@ -2494,7 +2494,7 @@ static void nxpwifi_sdio_card_reset(struct nxpwifi_adapter *adapter)
 	struct sdio_mmc_card *card = adapter->card;
 
 	if (!test_and_set_bit(NXPWIFI_IFACE_WORK_CARD_RESET, &card->work_flags))
-		schedule_work(&card->work);
+		nxpwifi_queue_work(adapter, &card->work);
 }
 
 /* This function dumps FW information */
@@ -2504,7 +2504,7 @@ static void nxpwifi_sdio_device_dump(struct nxpwifi_adapter *adapter)
 
 	if (!test_and_set_bit(NXPWIFI_IFACE_WORK_DEVICE_DUMP,
 			      &card->work_flags))
-		schedule_work(&card->work);
+		nxpwifi_queue_work(adapter, &card->work);
 }
 
 /* Function to dump SDIO function registers and SDIO scratch registers in case

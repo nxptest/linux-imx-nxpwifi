@@ -133,21 +133,6 @@ static void nxpwifi_unregister(struct nxpwifi_adapter *adapter)
 	kfree(adapter);
 }
 
-void nxpwifi_queue_main_work(struct nxpwifi_adapter *adapter)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&adapter->main_proc_lock, flags);
-	if (adapter->nxpwifi_processing) {
-		adapter->more_task_flag = true;
-		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
-	} else {
-		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
-		queue_work(adapter->workqueue, &adapter->main_work);
-	}
-}
-EXPORT_SYMBOL_GPL(nxpwifi_queue_main_work);
-
 static void nxpwifi_queue_rx_work(struct nxpwifi_adapter *adapter)
 {
 	spin_lock_bh(&adapter->rx_proc_lock);
@@ -179,7 +164,7 @@ static void nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 		if (adapter->delay_main_work &&
 		    (atomic_read(&adapter->rx_pending) < LOW_RX_PENDING)) {
 			adapter->delay_main_work = false;
-			nxpwifi_queue_main_work(adapter);
+			nxpwifi_queue_work(adapter, &adapter->main_work);
 		}
 		rx_info = NXPWIFI_SKB_RXCB(skb);
 		if (rx_info->buf_type == NXPWIFI_TYPE_AGGR_DATA) {
@@ -484,11 +469,6 @@ static void nxpwifi_terminate_workqueue(struct nxpwifi_adapter *adapter)
 		destroy_workqueue(adapter->rx_workqueue);
 		adapter->rx_workqueue = NULL;
 	}
-
-	if (adapter->host_mlme_workqueue) {
-		destroy_workqueue(adapter->host_mlme_workqueue);
-		adapter->host_mlme_workqueue = NULL;
-	}
 }
 
 /* This function gets firmware and initializes it.
@@ -735,6 +715,7 @@ nxpwifi_bypass_tx_queue(struct nxpwifi_private *priv,
  */
 void nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb)
 {
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	struct netdev_queue *txq;
 	int index = nxpwifi_1d_to_wmm_queue[skb->priority];
 
@@ -742,21 +723,21 @@ void nxpwifi_queue_tx_pkt(struct nxpwifi_private *priv, struct sk_buff *skb)
 		txq = netdev_get_tx_queue(priv->netdev, index);
 		if (!netif_tx_queue_stopped(txq)) {
 			netif_tx_stop_queue(txq);
-			nxpwifi_dbg(priv->adapter, DATA,
+			nxpwifi_dbg(adapter, DATA,
 				    "stop queue: %d\n", index);
 		}
 	}
 
 	if (nxpwifi_bypass_tx_queue(priv, skb)) {
-		atomic_inc(&priv->adapter->tx_pending);
-		atomic_inc(&priv->adapter->bypass_tx_pending);
+		atomic_inc(&adapter->tx_pending);
+		atomic_inc(&adapter->bypass_tx_pending);
 		nxpwifi_wmm_add_buf_bypass_txqueue(priv, skb);
 	} else {
-		atomic_inc(&priv->adapter->tx_pending);
+		atomic_inc(&adapter->tx_pending);
 		nxpwifi_wmm_add_buf_txqueue(priv, skb);
 	}
 
-	nxpwifi_queue_main_work(priv->adapter);
+	nxpwifi_queue_work(adapter, &adapter->main_work);
 }
 
 struct sk_buff *
@@ -1236,10 +1217,10 @@ int is_command_pending(struct nxpwifi_adapter *adapter)
 	return !is_cmd_pend_q_empty;
 }
 
-/* This is the host mlme work queue function.
+/* This is the host mlme work function.
  * It handles the host mlme operations.
  */
-static void nxpwifi_host_mlme_work_queue(struct work_struct *work)
+static void nxpwifi_host_mlme_work(struct work_struct *work)
 {
 	struct nxpwifi_adapter *adapter =
 		container_of(work, struct nxpwifi_adapter, host_mlme_work);
@@ -1265,11 +1246,11 @@ static void nxpwifi_host_mlme_work_queue(struct work_struct *work)
 	}
 }
 
-/* This is the RX work queue function.
+/* This is the RX work function.
  *
  * It handles the RX operations.
  */
-static void nxpwifi_rx_work_queue(struct work_struct *work)
+static void nxpwifi_rx_work(struct work_struct *work)
 {
 	struct nxpwifi_adapter *adapter =
 		container_of(work, struct nxpwifi_adapter, rx_work);
@@ -1279,12 +1260,12 @@ static void nxpwifi_rx_work_queue(struct work_struct *work)
 	nxpwifi_process_rx(adapter);
 }
 
-/* This is the main work queue function.
+/* This is the main work function.
  *
  * It handles the main process, which in turn handles the complete
  * driver operations.
  */
-static void nxpwifi_main_work_queue(struct work_struct *work)
+static void nxpwifi_main_work(struct work_struct *work)
 {
 	struct nxpwifi_adapter *adapter =
 		container_of(work, struct nxpwifi_adapter, main_work);
@@ -1420,7 +1401,7 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 		goto err_kmalloc;
 	}
 
-	INIT_WORK(&adapter->main_work, nxpwifi_main_work_queue);
+	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
 
 	if (adapter->rx_work_enabled) {
 		adapter->rx_workqueue = alloc_workqueue("NXPWIFI_RX_WORK_QUEUE",
@@ -1431,18 +1412,10 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 			ret = -ENOMEM;
 			goto err_kmalloc;
 		}
-		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work_queue);
+		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work);
 	}
 
-	adapter->host_mlme_workqueue =
-		alloc_workqueue("NXPWIFI_HOST_MLME_WORK_QUEUE",
-				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->host_mlme_workqueue) {
-		ret = -ENOMEM;
-		goto err_kmalloc;
-	}
-
-	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work_queue);
+	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
 
 	/* Register the device. Fill up the private data structure with
 	 * relevant information from the card. Some code extracted from
@@ -1592,7 +1565,7 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 		goto err_kmalloc;
 	}
 
-	INIT_WORK(&adapter->main_work, nxpwifi_main_work_queue);
+	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
 
 	if (adapter->rx_work_enabled) {
 		adapter->rx_workqueue = alloc_workqueue("NXPWIFI_RX_WORK_QUEUE",
@@ -1604,18 +1577,10 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 			goto err_kmalloc;
 		}
 
-		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work_queue);
+		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work);
 	}
 
-	adapter->host_mlme_workqueue =
-		alloc_workqueue("NXPWIFI_HOST_MLME_WORK_QUEUE",
-				WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 0);
-	if (!adapter->host_mlme_workqueue) {
-		ret = -ENOMEM;
-		goto err_kmalloc;
-	}
-
-	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work_queue);
+	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
 
 	/* Register the device. Fill up the private data structure with relevant
 	 * information from the card.

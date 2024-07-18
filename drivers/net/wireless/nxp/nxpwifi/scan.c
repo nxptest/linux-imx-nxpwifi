@@ -1458,7 +1458,7 @@ int nxpwifi_scan_networks(struct nxpwifi_private *priv,
 			list_del(&cmd_node->list);
 			spin_unlock_bh(&adapter->scan_pending_q_lock);
 			nxpwifi_insert_cmd_to_pending_q(adapter, cmd_node);
-			queue_work(adapter->workqueue, &adapter->main_work);
+			nxpwifi_queue_work(adapter, &adapter->main_work);
 
 			/* Perform internal scan synchronously */
 			if (!priv->scan_request) {

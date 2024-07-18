@@ -196,7 +196,7 @@ static int nxpwifi_dnld_cmd_to_fw(struct nxpwifi_private *priv,
 			    "DNLD_CMD: FW in reset state, ignore cmd %#x\n",
 			cmd_code);
 		nxpwifi_recycle_cmd_node(adapter, cmd_node);
-		queue_work(adapter->workqueue, &adapter->main_work);
+		nxpwifi_queue_work(adapter, &adapter->main_work);
 		return -EPERM;
 	}
 
@@ -600,7 +600,7 @@ int nxpwifi_send_cmd(struct nxpwifi_private *priv, u16 cmd_no,
 		nxpwifi_queue_scan_cmd(priv, cmd_node);
 	} else {
 		nxpwifi_insert_cmd_to_pending_q(adapter, cmd_node);
-		queue_work(adapter->workqueue, &adapter->main_work);
+		nxpwifi_queue_work(adapter, &adapter->main_work);
 		if (cmd_node->wait_q_enabled)
 			ret = nxpwifi_wait_queue_complete(adapter, cmd_node);
 	}

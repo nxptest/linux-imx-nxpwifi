@@ -25,8 +25,8 @@ nxpwifi_sta_event_link_lost(struct nxpwifi_private *priv)
 		reason_code = get_unaligned_le16(adapter->event_body);
 		adapter->priv_link_lost = priv;
 		adapter->host_mlme_link_lost = true;
-		queue_work(adapter->host_mlme_workqueue,
-			   &adapter->host_mlme_work);
+		nxpwifi_queue_work(adapter,
+				   &adapter->host_mlme_work);
 	}
 
 	return 0;
