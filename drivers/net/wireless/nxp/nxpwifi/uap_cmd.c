@@ -777,44 +777,35 @@ int nxpwifi_set_secure_params(struct nxpwifi_private *priv,
 
 	bss_config->key_mgmt_operation |= KEY_MGMT_ON_HOST;
 
+	bss_config->protocol = 0;
+	if (params->crypto.wpa_versions & NL80211_WPA_VERSION_1)
+		bss_config->protocol |= PROTOCOL_WPA;
+	if (params->crypto.wpa_versions & NL80211_WPA_VERSION_2)
+		bss_config->protocol |= PROTOCOL_WPA2;
+
+	bss_config->key_mgmt = 0;
 	for (i = 0; i < params->crypto.n_akm_suites; i++) {
 		switch (params->crypto.akm_suites[i]) {
 		case WLAN_AKM_SUITE_8021X:
-			if (params->crypto.wpa_versions &
-			    NL80211_WPA_VERSION_1) {
-				bss_config->protocol = PROTOCOL_WPA;
-				bss_config->key_mgmt = KEY_MGMT_EAP;
-			}
-			if (params->crypto.wpa_versions &
-			    NL80211_WPA_VERSION_2) {
-				bss_config->protocol |= PROTOCOL_WPA2;
-				bss_config->key_mgmt = KEY_MGMT_EAP;
-			}
+			bss_config->key_mgmt |= KEY_MGMT_EAP;
 			break;
 		case WLAN_AKM_SUITE_PSK:
-			if (params->crypto.wpa_versions &
-			    NL80211_WPA_VERSION_1) {
-				bss_config->protocol = PROTOCOL_WPA;
-				bss_config->key_mgmt = KEY_MGMT_PSK;
-			}
-			if (params->crypto.wpa_versions &
-			    NL80211_WPA_VERSION_2) {
-				bss_config->protocol |= PROTOCOL_WPA2;
-				bss_config->key_mgmt = KEY_MGMT_PSK;
-			}
+			bss_config->key_mgmt |= KEY_MGMT_PSK;
 			break;
-		case WLAN_AKM_SUITE_SAE:
-			bss_config->protocol = PROTOCOL_WPA2;
-			bss_config->key_mgmt = KEY_MGMT_SAE;
+		case WLAN_AKM_SUITE_PSK_SHA256:
+			bss_config->key_mgmt |= KEY_MGMT_PSK_SHA256;
 			break;
 		case WLAN_AKM_SUITE_OWE:
-			bss_config->protocol = PROTOCOL_WPA2;
-			bss_config->key_mgmt = KEY_MGMT_OWE;
+			bss_config->key_mgmt |= KEY_MGMT_OWE;
+			break;
+		case WLAN_AKM_SUITE_SAE:
+			bss_config->key_mgmt |= KEY_MGMT_SAE;
 			break;
 		default:
 			break;
 		}
 	}
+
 	for (i = 0; i < params->crypto.n_ciphers_pairwise; i++) {
 		switch (params->crypto.ciphers_pairwise[i]) {
 		case WLAN_CIPHER_SUITE_WEP40:

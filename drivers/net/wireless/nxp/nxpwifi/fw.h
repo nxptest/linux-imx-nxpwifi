@@ -413,6 +413,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define KEY_MGMT_EAP                0x01
 #define KEY_MGMT_PSK                0x02
 #define KEY_MGMT_NONE               0x04
+#define KEY_MGMT_PSK_SHA256         0x100
 #define KEY_MGMT_OWE                0x200
 #define KEY_MGMT_SAE                0x400
 #define CIPHER_TKIP                 0x04

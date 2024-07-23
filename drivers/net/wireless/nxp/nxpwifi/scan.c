@@ -2671,41 +2671,6 @@ nxpwifi_queue_scan_cmd(struct nxpwifi_private *priv,
 	spin_unlock_bh(&adapter->scan_pending_q_lock);
 }
 
-/* This function sends a scan command for all available channels to the
- * firmware, filtered on a specific SSID.
- */
-static int nxpwifi_scan_specific_ssid(struct nxpwifi_private *priv,
-				      struct cfg80211_ssid *req_ssid)
-{
-	struct nxpwifi_adapter *adapter = priv->adapter;
-	int ret;
-	struct nxpwifi_user_scan_cfg *scan_cfg;
-
-	if (adapter->scan_processing) {
-		nxpwifi_dbg(adapter, WARN,
-			    "cmd: Scan already in process...\n");
-		return -EBUSY;
-	}
-
-	if (priv->scan_block) {
-		nxpwifi_dbg(adapter, WARN,
-			    "cmd: Scan is blocked during association...\n");
-		return -EBUSY;
-	}
-
-	scan_cfg = kzalloc(sizeof(*scan_cfg), GFP_KERNEL);
-	if (!scan_cfg)
-		return -ENOMEM;
-
-	scan_cfg->ssid_list = req_ssid;
-	scan_cfg->num_ssids = 1;
-
-	ret = nxpwifi_scan_networks(priv, scan_cfg);
-
-	kfree(scan_cfg);
-	return ret;
-}
-
 /* This function appends the vendor specific IE TLV to a buffer.
  */
 int
