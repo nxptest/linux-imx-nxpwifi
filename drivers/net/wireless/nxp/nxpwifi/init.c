@@ -51,14 +51,6 @@ static void wakeup_timer_fn(struct timer_list *t)
 		adapter->if_ops.card_reset(adapter);
 }
 
-static void fw_dump_work(struct work_struct *work)
-{
-	struct nxpwifi_adapter *adapter =
-		container_of(work, struct nxpwifi_adapter, devdump_work.work);
-
-	nxpwifi_upload_device_dump(adapter);
-}
-
 /* This function initializes the private structure and sets default
  * values to the members.
  *
@@ -296,7 +288,6 @@ static void nxpwifi_init_adapter(struct nxpwifi_adapter *adapter)
 	adapter->active_scan_triggered = false;
 	timer_setup(&adapter->wakeup_timer, wakeup_timer_fn, 0);
 	adapter->devdump_len = 0;
-	INIT_DELAYED_WORK(&adapter->devdump_work, fw_dump_work);
 	memset(&adapter->vdll_ctrl, 0, sizeof(adapter->vdll_ctrl));
 	adapter->vdll_ctrl.skb = dev_alloc_skb(NXPWIFI_SIZE_OF_CMD_BUFFER);
 }
@@ -371,7 +362,6 @@ static void
 nxpwifi_adapter_cleanup(struct nxpwifi_adapter *adapter)
 {
 	del_timer(&adapter->wakeup_timer);
-	cancel_delayed_work_sync(&adapter->devdump_work);
 	nxpwifi_cancel_all_pending_cmd(adapter);
 	wake_up_interruptible(&adapter->cmd_wait_q.wait);
 	wake_up_interruptible(&adapter->hs_activate_wait_q);
@@ -618,20 +608,17 @@ nxpwifi_shutdown_drv(struct nxpwifi_adapter *adapter)
 	while ((skb = skb_dequeue(&adapter->tx_data_q)))
 		nxpwifi_write_data_complete(adapter, skb, 0, 0);
 
-	spin_lock_bh(&adapter->rx_proc_lock);
+	tasklet_disable(&adapter->rx_task);
 
 	while ((skb = skb_dequeue(&adapter->rx_data_q))) {
 		struct nxpwifi_rxinfo *rx_info = NXPWIFI_SKB_RXCB(skb);
 
-		atomic_dec(&adapter->rx_pending);
 		priv = adapter->priv[rx_info->bss_num];
 		if (priv)
 			priv->stats.rx_dropped++;
 
 		dev_kfree_skb_any(skb);
 	}
-
-	spin_unlock_bh(&adapter->rx_proc_lock);
 
 	nxpwifi_adapter_cleanup(adapter);
 

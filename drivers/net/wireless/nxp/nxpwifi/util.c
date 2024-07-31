@@ -110,8 +110,6 @@ static struct nxpwifi_debug_data items[] = {
 	 adapter_item_addr(cmd_pending), 1},
 	{"tx_pending", adapter_item_size(tx_pending),
 	 adapter_item_addr(tx_pending), 1},
-	{"rx_pending", adapter_item_size(rx_pending),
-	 adapter_item_addr(rx_pending), 1},
 };
 
 static int num_of_items = ARRAY_SIZE(items);

@@ -178,19 +178,13 @@ static void
 nxpwifi_del_rx_reorder_entry(struct nxpwifi_private *priv,
 			     struct nxpwifi_rx_reorder_tbl *tbl)
 {
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	int start_win;
 
 	if (!tbl)
 		return;
 
-	spin_lock_bh(&priv->adapter->rx_proc_lock);
-	priv->adapter->rx_locked = true;
-	if (priv->adapter->rx_processing) {
-		spin_unlock_bh(&priv->adapter->rx_proc_lock);
-		flush_workqueue(priv->adapter->rx_workqueue);
-	} else {
-		spin_unlock_bh(&priv->adapter->rx_proc_lock);
-	}
+	tasklet_disable(&adapter->rx_task);
 
 	start_win = (tbl->start_win + tbl->win_size) & (MAX_TID_VALUE - 1);
 	nxpwifi_11n_dispatch_pkt_until_start_win(priv, tbl, start_win);
@@ -205,9 +199,7 @@ nxpwifi_del_rx_reorder_entry(struct nxpwifi_private *priv,
 	kfree(tbl->rx_reorder_ptr);
 	kfree(tbl);
 
-	spin_lock_bh(&priv->adapter->rx_proc_lock);
-	priv->adapter->rx_locked = false;
-	spin_unlock_bh(&priv->adapter->rx_proc_lock);
+	tasklet_enable(&adapter->rx_task);
 }
 
 /* This function returns the pointer to an entry in Rx reordering

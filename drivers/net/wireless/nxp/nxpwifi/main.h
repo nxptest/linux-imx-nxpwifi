@@ -796,25 +796,21 @@ struct nxpwifi_adapter {
 	void *card;
 	struct nxpwifi_if_ops if_ops;
 	atomic_t bypass_tx_pending;
-	atomic_t rx_pending;
 	atomic_t tx_pending;
 	atomic_t cmd_pending;
 	atomic_t tx_hw_pending;
 	struct workqueue_struct *workqueue;
 	struct work_struct main_work;
-	struct workqueue_struct *rx_workqueue;
-	struct work_struct rx_work;
 	struct work_struct host_mlme_work;
-	bool rx_work_enabled;
-	bool rx_processing;
-	bool delay_main_work;
-	bool rx_locked;
-	bool main_locked;
-	struct nxpwifi_bss_prio_tbl bss_prio_tbl[NXPWIFI_MAX_BSS_NUM];
-	/* spin lock for main process */
+	struct tasklet_struct rx_task;
+
+	/* spin lock for following variables */
 	spinlock_t main_proc_lock;
+	bool main_locked;
 	u32 nxpwifi_processing;
 	u8 more_task_flag;
+
+	struct nxpwifi_bss_prio_tbl bss_prio_tbl[NXPWIFI_MAX_BSS_NUM];
 	u16 tx_buf_size;
 	u16 curr_tx_buf_size;
 	/* sdio single port rx aggregation capability */
@@ -956,7 +952,6 @@ struct nxpwifi_adapter {
 	/* Device dump data/length */
 	void *devdump_data;
 	int devdump_len;
-	struct delayed_work devdump_work;
 
 	bool ignore_btcoex_events;
 

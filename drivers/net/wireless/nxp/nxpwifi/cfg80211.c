@@ -766,14 +766,7 @@ static int nxpwifi_deinit_priv_params(struct nxpwifi_private *priv)
 		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
 	}
 
-	spin_lock_bh(&adapter->rx_proc_lock);
-	adapter->rx_locked = true;
-	if (adapter->rx_processing) {
-		spin_unlock_bh(&adapter->rx_proc_lock);
-		flush_workqueue(adapter->rx_workqueue);
-	} else {
-		spin_unlock_bh(&adapter->rx_proc_lock);
-	}
+	tasklet_disable(&adapter->rx_task);
 
 	nxpwifi_free_priv(priv);
 	priv->wdev.iftype = NL80211_IFTYPE_UNSPECIFIED;
@@ -819,9 +812,7 @@ nxpwifi_init_new_priv_params(struct nxpwifi_private *priv,
 	adapter->main_locked = false;
 	spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
 
-	spin_lock_bh(&adapter->rx_proc_lock);
-	adapter->rx_locked = false;
-	spin_unlock_bh(&adapter->rx_proc_lock);
+	tasklet_enable(&adapter->rx_task);
 
 	nxpwifi_set_mac_address(priv, dev, false, NULL);
 

@@ -133,39 +133,13 @@ static void nxpwifi_unregister(struct nxpwifi_adapter *adapter)
 	kfree(adapter);
 }
 
-static void nxpwifi_queue_rx_work(struct nxpwifi_adapter *adapter)
-{
-	spin_lock_bh(&adapter->rx_proc_lock);
-	if (adapter->rx_processing) {
-		spin_unlock_bh(&adapter->rx_proc_lock);
-	} else {
-		spin_unlock_bh(&adapter->rx_proc_lock);
-		queue_work(adapter->rx_workqueue, &adapter->rx_work);
-	}
-}
-
 static void nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 {
 	struct sk_buff *skb;
 	struct nxpwifi_rxinfo *rx_info;
 
-	spin_lock_bh(&adapter->rx_proc_lock);
-	if (adapter->rx_processing || adapter->rx_locked) {
-		spin_unlock_bh(&adapter->rx_proc_lock);
-		return;
-	} else {
-		adapter->rx_processing = true;
-		spin_unlock_bh(&adapter->rx_proc_lock);
-	}
-
 	/* Check for Rx data */
 	while ((skb = skb_dequeue(&adapter->rx_data_q))) {
-		atomic_dec(&adapter->rx_pending);
-		if (adapter->delay_main_work &&
-		    (atomic_read(&adapter->rx_pending) < LOW_RX_PENDING)) {
-			adapter->delay_main_work = false;
-			nxpwifi_queue_work(adapter, &adapter->main_work);
-		}
 		rx_info = NXPWIFI_SKB_RXCB(skb);
 		if (rx_info->buf_type == NXPWIFI_TYPE_AGGR_DATA) {
 			if (adapter->if_ops.deaggr_pkt)
@@ -175,9 +149,6 @@ static void nxpwifi_process_rx(struct nxpwifi_adapter *adapter)
 			nxpwifi_handle_rx_packet(adapter, skb);
 		}
 	}
-	spin_lock_bh(&adapter->rx_proc_lock);
-	adapter->rx_processing = false;
-	spin_unlock_bh(&adapter->rx_proc_lock);
 }
 
 static void maybe_quirk_fw_disable_ds(struct nxpwifi_adapter *adapter)
@@ -232,19 +203,6 @@ process_start:
 		if (adapter->hw_status == NXPWIFI_HW_STATUS_NOT_READY)
 			break;
 
-		/* For non-USB interfaces, If we process interrupts first, it
-		 * would increase RX pending even further. Avoid this by
-		 * checking if rx_pending has crossed high threshold and
-		 * schedule rx work queue and then process interrupts.
-		 * For USB interface, there are no interrupts. We already have
-		 * HIGH_RX_PENDING check in usb.c
-		 */
-		if (atomic_read(&adapter->rx_pending) >= HIGH_RX_PENDING) {
-			adapter->delay_main_work = true;
-			nxpwifi_queue_rx_work(adapter);
-			break;
-		}
-
 		/* Handle pending interrupt if any */
 		if (adapter->int_status) {
 			if (adapter->hs_activated)
@@ -252,9 +210,6 @@ process_start:
 			if (adapter->if_ops.process_int_status)
 				adapter->if_ops.process_int_status(adapter);
 		}
-
-		if (adapter->rx_work_enabled && adapter->data_received)
-			nxpwifi_queue_rx_work(adapter);
 
 		/* Need to wake up the card ? */
 		if (adapter->ps_state == PS_STATE_SLEEP &&
@@ -464,11 +419,6 @@ static void nxpwifi_terminate_workqueue(struct nxpwifi_adapter *adapter)
 		destroy_workqueue(adapter->workqueue);
 		adapter->workqueue = NULL;
 	}
-
-	if (adapter->rx_workqueue) {
-		destroy_workqueue(adapter->rx_workqueue);
-		adapter->rx_workqueue = NULL;
-	}
 }
 
 /* This function gets firmware and initializes it.
@@ -590,6 +540,7 @@ err_dnld_fw:
 		adapter->if_ops.unregister_dev(adapter);
 
 	set_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags);
+	tasklet_kill(&adapter->rx_task);
 	nxpwifi_terminate_workqueue(adapter);
 
 	if (adapter->hw_status == NXPWIFI_HW_STATUS_READY) {
@@ -999,8 +950,6 @@ void nxpwifi_drv_info_dump(struct nxpwifi_adapter *adapter)
 
 	p += sprintf(p, "tx_pending = %d\n",
 		     atomic_read(&adapter->tx_pending));
-	p += sprintf(p, "rx_pending = %d\n",
-		     atomic_read(&adapter->rx_pending));
 
 	if (adapter->iface_type == NXPWIFI_SDIO) {
 		sdio_card = (struct sdio_mmc_card *)adapter->card;
@@ -1217,6 +1166,34 @@ int is_command_pending(struct nxpwifi_adapter *adapter)
 	return !is_cmd_pend_q_empty;
 }
 
+/* This is the RX tasklet function.
+ *
+ * It handles the RX operations.
+ */
+static void nxpwifi_rx_recv(unsigned long data)
+{
+	struct nxpwifi_adapter *adapter = (struct nxpwifi_adapter *)data;
+
+	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
+		return;
+	nxpwifi_process_rx(adapter);
+}
+
+/* This is the main work function.
+ *
+ * It handles the main process, which in turn handles the complete
+ * driver operations.
+ */
+static void nxpwifi_main_work(struct work_struct *work)
+{
+	struct nxpwifi_adapter *adapter =
+		container_of(work, struct nxpwifi_adapter, main_work);
+
+	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
+		return;
+	nxpwifi_main_process(adapter);
+}
+
 /* This is the host mlme work function.
  * It handles the host mlme operations.
  */
@@ -1246,35 +1223,6 @@ static void nxpwifi_host_mlme_work(struct work_struct *work)
 	}
 }
 
-/* This is the RX work function.
- *
- * It handles the RX operations.
- */
-static void nxpwifi_rx_work(struct work_struct *work)
-{
-	struct nxpwifi_adapter *adapter =
-		container_of(work, struct nxpwifi_adapter, rx_work);
-
-	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
-		return;
-	nxpwifi_process_rx(adapter);
-}
-
-/* This is the main work function.
- *
- * It handles the main process, which in turn handles the complete
- * driver operations.
- */
-static void nxpwifi_main_work(struct work_struct *work)
-{
-	struct nxpwifi_adapter *adapter =
-		container_of(work, struct nxpwifi_adapter, main_work);
-
-	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
-		return;
-	nxpwifi_main_process(adapter);
-}
-
 /* Common teardown code used for both device removal and reset */
 static void nxpwifi_uninit_sw(struct nxpwifi_adapter *adapter)
 {
@@ -1288,6 +1236,7 @@ static void nxpwifi_uninit_sw(struct nxpwifi_adapter *adapter)
 		adapter->if_ops.disable_int(adapter);
 
 	set_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags);
+	tasklet_kill(&adapter->rx_task);
 	nxpwifi_terminate_workqueue(adapter);
 	adapter->int_status = 0;
 
@@ -1306,13 +1255,10 @@ static void nxpwifi_uninit_sw(struct nxpwifi_adapter *adapter)
 	nxpwifi_shutdown_drv(adapter);
 	nxpwifi_dbg(adapter, CMD, "cmd: nxpwifi_shutdown_drv done\n");
 
-	if (atomic_read(&adapter->rx_pending) ||
-	    atomic_read(&adapter->tx_pending) ||
+	if (atomic_read(&adapter->tx_pending) ||
 	    atomic_read(&adapter->cmd_pending)) {
 		nxpwifi_dbg(adapter, ERROR,
-			    "rx_pending=%d, tx_pending=%d,\t"
-			    "cmd_pending=%d\n",
-			    atomic_read(&adapter->rx_pending),
+			    "tx_pending=%d,cmd_pending=%d\n",
 			    atomic_read(&adapter->tx_pending),
 			    atomic_read(&adapter->cmd_pending));
 	}
@@ -1390,8 +1336,9 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	adapter->cmd_wait_q.status = 0;
 	adapter->scan_wait_q_woken = false;
 
-	if (num_possible_cpus() > 1)
-		adapter->rx_work_enabled = true;
+	tasklet_init(&adapter->rx_task,
+		     (void *)nxpwifi_rx_recv, (unsigned long)adapter);
+	tasklet_disable(&adapter->rx_task);
 
 	adapter->workqueue =
 		alloc_workqueue("NXPWIFI_WORK_QUEUE",
@@ -1402,19 +1349,6 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	}
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
-
-	if (adapter->rx_work_enabled) {
-		adapter->rx_workqueue = alloc_workqueue("NXPWIFI_RX_WORK_QUEUE",
-							WQ_HIGHPRI |
-							WQ_MEM_RECLAIM |
-							WQ_UNBOUND, 0);
-		if (!adapter->rx_workqueue) {
-			ret = -ENOMEM;
-			goto err_kmalloc;
-		}
-		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work);
-	}
-
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
 
 	/* Register the device. Fill up the private data structure with
@@ -1438,6 +1372,8 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 	}
 	nxpwifi_dbg(adapter, INFO, "%s, successful\n", __func__);
 
+	tasklet_enable(&adapter->rx_task);
+
 	return ret;
 
 err_init_fw:
@@ -1447,6 +1383,7 @@ err_init_fw:
 
 err_kmalloc:
 	set_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags);
+	tasklet_kill(&adapter->rx_task);
 	nxpwifi_terminate_workqueue(adapter);
 	if (adapter->hw_status == NXPWIFI_HW_STATUS_READY) {
 		nxpwifi_dbg(adapter, ERROR,
@@ -1554,8 +1491,9 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 	adapter->cmd_wait_q.status = 0;
 	adapter->scan_wait_q_woken = false;
 
-	if (num_possible_cpus() > 1)
-		adapter->rx_work_enabled = true;
+	tasklet_init(&adapter->rx_task,
+		     (void *)nxpwifi_rx_recv, (unsigned long)adapter);
+	tasklet_disable(&adapter->rx_task);
 
 	adapter->workqueue =
 		alloc_workqueue("NXPWIFI_WORK_QUEUE",
@@ -1566,20 +1504,6 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 	}
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
-
-	if (adapter->rx_work_enabled) {
-		adapter->rx_workqueue = alloc_workqueue("NXPWIFI_RX_WORK_QUEUE",
-							WQ_HIGHPRI |
-							WQ_MEM_RECLAIM |
-							WQ_UNBOUND, 0);
-		if (!adapter->rx_workqueue) {
-			ret = -ENOMEM;
-			goto err_kmalloc;
-		}
-
-		INIT_WORK(&adapter->rx_work, nxpwifi_rx_work);
-	}
-
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
 
 	/* Register the device. Fill up the private data structure with relevant
@@ -1597,6 +1521,8 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 		goto err_init_fw;
 	}
 
+	tasklet_enable(&adapter->rx_task);
+
 	return ret;
 
 err_init_fw:
@@ -1605,6 +1531,7 @@ err_init_fw:
 		adapter->if_ops.unregister_dev(adapter);
 err_registerdev:
 	set_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags);
+	tasklet_kill(&adapter->rx_task);
 	nxpwifi_terminate_workqueue(adapter);
 	if (adapter->hw_status == NXPWIFI_HW_STATUS_READY) {
 		pr_debug("info: %s: shutdown nxpwifi\n", __func__);

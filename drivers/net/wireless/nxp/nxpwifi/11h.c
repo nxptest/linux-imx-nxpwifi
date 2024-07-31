@@ -116,9 +116,9 @@ void nxpwifi_dfs_cac_work(struct work_struct *work)
 {
 	struct cfg80211_chan_def chandef;
 	struct delayed_work *delayed_work = to_delayed_work(work);
-	struct nxpwifi_private *priv =
-			container_of(delayed_work, struct nxpwifi_private,
-				     dfs_cac_work);
+	struct nxpwifi_private *priv = container_of(delayed_work,
+						    struct nxpwifi_private,
+						    dfs_cac_work);
 
 	chandef = priv->dfs_chandef;
 	if (priv->wdev.cac_started) {

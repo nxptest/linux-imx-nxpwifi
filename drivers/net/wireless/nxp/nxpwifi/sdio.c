@@ -847,12 +847,6 @@ static void nxpwifi_interrupt_status(struct nxpwifi_adapter *adapter)
 
 	sdio_ireg = card->mp_regs[card->reg->host_int_status_reg];
 	if (sdio_ireg) {
-		/* DN_LD_HOST_INT_STATUS and/or UP_LD_HOST_INT_STATUS
-		 * For SDIO new mode CMD port interrupts
-		 *	DN_LD_CMD_PORT_HOST_INT_STATUS and/or
-		 *	UP_LD_CMD_PORT_HOST_INT_STATUS
-		 * Clear the interrupt status register
-		 */
 		nxpwifi_dbg(adapter, INTR,
 			    "int: sdio_ireg = %#x\n", sdio_ireg);
 		spin_lock_irqsave(&adapter->int_lock, flags);
@@ -1190,26 +1184,17 @@ static void nxpwifi_decode_rx_packet(struct nxpwifi_adapter *adapter,
 			    "info: --- Rx: Aggr Data packet ---\n");
 		rx_info = NXPWIFI_SKB_RXCB(skb);
 		rx_info->buf_type = NXPWIFI_TYPE_AGGR_DATA;
-		if (adapter->rx_work_enabled) {
-			skb_queue_tail(&adapter->rx_data_q, skb);
-			atomic_inc(&adapter->rx_pending);
-			adapter->data_received = true;
-		} else {
-			nxpwifi_deaggr_sdio_pkt(adapter, skb);
-			dev_kfree_skb_any(skb);
-		}
+		skb_queue_tail(&adapter->rx_data_q, skb);
+		adapter->data_received = true;
+		tasklet_schedule(&adapter->rx_task);
 		break;
 
 	case NXPWIFI_TYPE_DATA:
 		nxpwifi_dbg(adapter, DATA,
 			    "info: --- Rx: Data packet ---\n");
-		if (adapter->rx_work_enabled) {
-			skb_queue_tail(&adapter->rx_data_q, skb);
-			adapter->data_received = true;
-			atomic_inc(&adapter->rx_pending);
-		} else {
-			nxpwifi_handle_rx_packet(adapter, skb);
-		}
+		skb_queue_tail(&adapter->rx_data_q, skb);
+		adapter->data_received = true;
+		tasklet_schedule(&adapter->rx_task);
 		break;
 
 	case NXPWIFI_TYPE_CMD:
@@ -1509,11 +1494,9 @@ static int nxpwifi_process_int_status(struct nxpwifi_adapter *adapter)
 	if (!sdio_ireg)
 		return ret;
 
-	/* Following interrupt is only for SDIO new mode */
 	if (sdio_ireg & DN_LD_CMD_PORT_HOST_INT_STATUS && adapter->cmd_sent)
 		adapter->cmd_sent = false;
 
-	/* Following interrupt is only for SDIO new mode */
 	if (sdio_ireg & UP_LD_CMD_PORT_HOST_INT_STATUS) {
 		u32 pkt_type;
 
