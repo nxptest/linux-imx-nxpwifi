@@ -768,10 +768,8 @@ struct nxpwifi_if_ops {
 	void (*card_reset)(struct nxpwifi_adapter *adapter);
 	int (*reg_dump)(struct nxpwifi_adapter *adapter, char *drv_buf);
 	void (*device_dump)(struct nxpwifi_adapter *adapter);
-	void (*iface_work)(struct work_struct *work);
 	void (*deaggr_pkt)(struct nxpwifi_adapter *adapter,
 			   struct sk_buff *skb);
-	bool (*is_port_ready)(struct nxpwifi_private *adapter);
 	void (*up_dev)(struct nxpwifi_adapter *adapter);
 };
 

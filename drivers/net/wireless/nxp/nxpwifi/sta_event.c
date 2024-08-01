@@ -101,9 +101,7 @@ nxpwifi_sta_event_ps_awake(struct nxpwifi_private *priv)
 	adapter->tx_lock_flag = false;
 	if (adapter->pps_uapsd_mode && adapter->gen_null_pkt) {
 		if (nxpwifi_check_last_packet_indication(priv)) {
-			if (adapter->data_sent ||
-			    (adapter->if_ops.is_port_ready &&
-			     !adapter->if_ops.is_port_ready(priv))) {
+			if (adapter->data_sent) {
 				adapter->ps_state = PS_STATE_AWAKE;
 				adapter->pm_wakeup_card_req = false;
 				adapter->pm_wakeup_fw_try = false;

@@ -128,10 +128,6 @@ int nxpwifi_send_null_packet(struct nxpwifi_private *priv, u8 flags)
 	if (adapter->data_sent)
 		return -EBUSY;
 
-	if (adapter->if_ops.is_port_ready &&
-	    !adapter->if_ops.is_port_ready(priv))
-		return -EPERM;
-
 	skb = dev_alloc_skb(data_len);
 	if (!skb)
 		return -ENOMEM;

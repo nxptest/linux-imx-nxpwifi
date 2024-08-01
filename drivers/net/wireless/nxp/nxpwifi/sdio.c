@@ -1918,7 +1918,7 @@ error:
 
 /* This function unregisters the SDIO device.
  *
- * The SDIO IRQ is released, the function is disabled and driver
+ * The function is disabled and driver
  * data is set to null.
  */
 static void

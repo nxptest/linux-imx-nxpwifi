@@ -435,9 +435,6 @@ bool nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter)
 		priv = adapter->priv[i];
 		if (!priv)
 			continue;
-		if (adapter->if_ops.is_port_ready &&
-		    !adapter->if_ops.is_port_ready(priv))
-			continue;
 		if (!skb_queue_empty(&priv->bypass_txq))
 			return false;
 	}
@@ -457,9 +454,6 @@ bool nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter)
 		if (!priv)
 			continue;
 		if (!priv->port_open)
-			continue;
-		if (adapter->if_ops.is_port_ready &&
-		    !adapter->if_ops.is_port_ready(priv))
 			continue;
 		if (atomic_read(&priv->wmm.tx_pkts_queued))
 			return false;
@@ -973,10 +967,6 @@ try_again:
 			    (atomic_read(&priv_tmp->wmm.tx_pkts_queued) == 0))
 				continue;
 
-			if (adapter->if_ops.is_port_ready &&
-			    !adapter->if_ops.is_port_ready(priv_tmp))
-				continue;
-
 			/* iterate over the WMM queues of the BSS */
 			hqp = &priv_tmp->wmm.highest_queued_prio;
 			for (i = atomic_read(hqp); i >= LOW_PRIO_TID; --i) {
@@ -1347,10 +1337,6 @@ void nxpwifi_process_bypass_tx(struct nxpwifi_adapter *adapter)
 		priv = adapter->priv[i];
 
 		if (!priv)
-			continue;
-
-		if (adapter->if_ops.is_port_ready &&
-		    !adapter->if_ops.is_port_ready(priv))
 			continue;
 
 		if (skb_queue_empty(&priv->bypass_txq))
