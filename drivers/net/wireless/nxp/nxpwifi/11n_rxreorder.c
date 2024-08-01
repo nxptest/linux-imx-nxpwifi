@@ -37,10 +37,7 @@ static int nxpwifi_11n_dispatch_amsdu_pkt(struct nxpwifi_private *priv,
 					 priv->wdev.iftype, 0, NULL, NULL, false);
 
 		while (!skb_queue_empty(&list)) {
-			struct rx_packet_hdr *rx_hdr;
-
 			rx_skb = __skb_dequeue(&list);
-			rx_hdr = (struct rx_packet_hdr *)rx_skb->data;
 
 			if (priv->bss_role == NXPWIFI_BSS_ROLE_UAP)
 				ret = nxpwifi_uap_recv_packet(priv, rx_skb);

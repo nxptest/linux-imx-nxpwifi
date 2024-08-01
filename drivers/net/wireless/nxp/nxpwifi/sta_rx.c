@@ -75,13 +75,12 @@ int nxpwifi_process_rx_packet(struct nxpwifi_private *priv,
 	struct rxpd *local_rx_pd;
 	int hdr_chop;
 	struct ethhdr *eth;
-	u16 rx_pkt_off, rx_pkt_len;
+	u16 rx_pkt_off;
 	u8 adj_rx_rate = 0;
 
 	local_rx_pd = (struct rxpd *)(skb->data);
 
 	rx_pkt_off = le16_to_cpu(local_rx_pd->rx_pkt_offset);
-	rx_pkt_len = le16_to_cpu(local_rx_pd->rx_pkt_length);
 	rx_pkt_hdr = (void *)local_rx_pd + rx_pkt_off;
 
 	if (sizeof(rx_pkt_hdr->eth803_hdr) + sizeof(rfc1042_header) +

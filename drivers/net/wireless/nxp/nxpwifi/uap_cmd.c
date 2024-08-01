@@ -534,6 +534,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 	struct nxpwifi_sta_info *add_sta = (struct nxpwifi_sta_info *)data_buf;
 	struct station_parameters *params = add_sta->params;
 	struct nxpwifi_sta_node *sta_ptr;
+	u16 cmd_size;
 	u8 *pos, *cmd_end;
 	u16 tlv_len;
 	struct nxpwifi_ie_types_sta_flag *sta_flag;
@@ -541,7 +542,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 
 	cmd->command = cpu_to_le16(HOST_CMD_ADD_NEW_STATION);
 	new_sta->action = cpu_to_le16(cmd_action);
-	cmd->size = sizeof(struct host_cmd_ds_add_station) + S_DS_GEN;
+	cmd_size = sizeof(struct host_cmd_ds_add_station) + S_DS_GEN;
 
 	if (cmd_action == HOST_ACT_ADD_STA)
 		sta_ptr = nxpwifi_add_sta_entry(priv, add_sta->peer_mac);
@@ -554,7 +555,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 	memcpy(new_sta->peer_mac, add_sta->peer_mac, ETH_ALEN);
 
 	if (cmd_action == HOST_ACT_REMOVE_STA) {
-		cmd->size = cpu_to_le16(cmd->size);
+		cmd->size = cpu_to_le16(cmd_size);
 		return 0;
 	}
 
@@ -573,7 +574,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 	sta_flag->header.len = cpu_to_le16(sizeof(__le32));
 	sta_flag->sta_flags = cpu_to_le32(params->sta_flags_set);
 	pos += sizeof(struct nxpwifi_ie_types_sta_flag);
-	cmd->size += sizeof(struct nxpwifi_ie_types_sta_flag);
+	cmd_size += sizeof(struct nxpwifi_ie_types_sta_flag);
 
 	if (params->ext_capab_len) {
 		u8 *data = (u8 *)params->ext_capab;
@@ -584,7 +585,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 	}
 
 	if (params->link_sta_params.supported_rates_len) {
@@ -596,7 +597,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 	}
 
 	if (params->uapsd_queues || params->max_sp) {
@@ -609,7 +610,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 		sta_ptr->is_wmm_enabled = 1;
 	}
 
@@ -622,7 +623,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 		sta_ptr->is_11n_enabled = 1;
 		sta_ptr->max_amsdu =
 			le16_to_cpu(params->link_sta_params.ht_capa->cap_info) &
@@ -640,7 +641,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 		sta_ptr->is_11ac_enabled = 1;
 	}
 
@@ -653,7 +654,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		if (!tlv_len)
 			return -EINVAL;
 		pos += tlv_len;
-		cmd->size += tlv_len;
+		cmd_size += tlv_len;
 	}
 
 	for (i = 0; i < MAX_NUM_TID; i++) {
@@ -666,7 +667,7 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 
 	memset(sta_ptr->rx_seq, 0xff, sizeof(sta_ptr->rx_seq));
 
-	cmd->size = cpu_to_le16(cmd->size);
+	cmd->size = cpu_to_le16(cmd_size);
 
 	return 0;
 }

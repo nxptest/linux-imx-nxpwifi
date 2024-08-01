@@ -175,7 +175,7 @@ u8 nxpwifi_get_channel_2_offset(int chan)
 static void nxpwifi_convert_chan_to_band_cfg(u8 *band_cfg,
 					     struct cfg80211_chan_def *chan_def)
 {
-	u8 chan_band, chan_width, chan2_offset;
+	u8 chan_band = 0, chan_width = 0, chan2_offset = 0;
 
 	switch (chan_def->chan->band) {
 	case NL80211_BAND_2GHZ:

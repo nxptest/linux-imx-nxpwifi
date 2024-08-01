@@ -18,11 +18,9 @@ static int
 nxpwifi_sta_event_link_lost(struct nxpwifi_private *priv)
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
-	u16 reason_code;
 
 	adapter->dbg.num_event_link_lost++;
 	if (priv->media_connected) {
-		reason_code = get_unaligned_le16(adapter->event_body);
 		adapter->priv_link_lost = priv;
 		adapter->host_mlme_link_lost = true;
 		nxpwifi_queue_work(adapter,

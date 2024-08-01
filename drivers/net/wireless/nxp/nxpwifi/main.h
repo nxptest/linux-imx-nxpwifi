@@ -802,10 +802,17 @@ struct nxpwifi_adapter {
 	struct work_struct host_mlme_work;
 	struct tasklet_struct rx_task;
 
-	/* spin lock for following variables */
+	/* spin lock for following variables which
+	 * are used to synchronize main process function
+	 */
 	spinlock_t main_proc_lock;
+	/* avoid execution of main process function */
 	bool main_locked;
+	/* indicate if main process function is running */
 	u32 nxpwifi_processing;
+	/* indicate if there are more tasks should be done
+	 * by main process function
+	 */
 	u8 more_task_flag;
 
 	struct nxpwifi_bss_prio_tbl bss_prio_tbl[NXPWIFI_MAX_BSS_NUM];
