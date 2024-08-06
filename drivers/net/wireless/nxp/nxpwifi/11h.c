@@ -130,7 +130,7 @@ void nxpwifi_dfs_cac_work(struct work_struct *work)
 	}
 }
 
-u8 nxpwifi_get_channel_2_offset(int chan)
+static u8 nxpwifi_get_channel_2_offset(int chan)
 {
 	u8 chan2_offset = SEC_CHAN_NONE;
 

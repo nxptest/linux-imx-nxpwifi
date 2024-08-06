@@ -2353,8 +2353,6 @@ struct wireless_dev *nxpwifi_add_virtual_intf(struct wiphy *wiphy,
 	return &priv->wdev;
 
 err_reg_netdev:
-err_alloc_chsw:
-err_alloc_cac:
 	free_netdev(dev);
 	priv->netdev = NULL;
 err_sta_init:
