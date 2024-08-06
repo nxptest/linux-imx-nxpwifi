@@ -10,13 +10,13 @@ config NXPWIFI
 	  nxpwifi.
 
 config NXPWIFI_SDIO
-	tristate "NXP WiFi Driver for IW416"
+	tristate "NXP WiFi Driver for IW61x"
 	depends on NXPWIFI && MMC
 	select FW_LOADER
 	select WANT_DEV_COREDUMP
 	help
 	  This adds support for wireless adapters based on NXP
-	  IW416 interface.
+	  IW61x interface.
 
 	  If you choose to build it as a module, it will be called
 	  nxpwifi_sdio.
