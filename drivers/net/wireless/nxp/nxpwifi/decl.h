@@ -169,6 +169,7 @@ struct nxpwifi_rxinfo {
 	u8 bss_type;
 	u8 use_count;
 	u8 buf_type;
+	u16 pkt_len;
 };
 
 struct nxpwifi_txinfo {

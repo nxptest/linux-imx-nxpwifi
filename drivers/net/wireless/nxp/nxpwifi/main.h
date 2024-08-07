@@ -800,6 +800,7 @@ struct nxpwifi_adapter {
 	struct workqueue_struct *workqueue;
 	struct work_struct main_work;
 	struct work_struct host_mlme_work;
+	struct work_struct rx_mlme_work;
 	struct tasklet_struct rx_task;
 
 	/* spin lock for following variables which
@@ -856,8 +857,6 @@ struct nxpwifi_adapter {
 	struct list_head scan_pending_q;
 	/* spin lock for scan_pending_q */
 	spinlock_t scan_pending_q_lock;
-	/* spin lock for RX processing routine */
-	spinlock_t rx_proc_lock;
 	struct sk_buff_head tx_data_q;
 	atomic_t tx_queued;
 	u32 scan_processing;
@@ -933,6 +932,7 @@ struct nxpwifi_adapter {
 	struct memory_type_mapping *mem_type_mapping_tbl;
 	u8 num_mem_types;
 	bool scan_chan_gap_enabled;
+	struct sk_buff_head rx_mlme_q;
 	struct sk_buff_head rx_data_q;
 	struct nxpwifi_chan_stats *chan_stats;
 	u32 num_in_chan_stats;
@@ -1214,7 +1214,7 @@ nxpwifi_get_unused_priv_by_bss_type(struct nxpwifi_adapter *adapter,
 		if (adapter->priv[i]->bss_mode ==
 		   NL80211_IFTYPE_UNSPECIFIED) {
 			adapter->priv[i]->bss_num =
-			nxpwifi_get_unused_bss_num(adapter, bss_type);
+				nxpwifi_get_unused_bss_num(adapter, bss_type);
 			break;
 		}
 

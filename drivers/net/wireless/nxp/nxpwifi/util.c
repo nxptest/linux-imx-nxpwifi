@@ -381,6 +381,7 @@ int
 nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 			    struct sk_buff *skb)
 {
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	struct rxpd *rx_pd;
 	u16 pkt_len;
 	struct ieee80211_hdr *ieee_hdr;
@@ -391,7 +392,7 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 
 	if (!priv->mgmt_frame_mask ||
 	    priv->wdev.iftype == NL80211_IFTYPE_UNSPECIFIED) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "do not receive mgmt frames on uninitialized intf");
 		return -EINVAL;
 	}
@@ -399,7 +400,7 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 	rx_pd = (struct rxpd *)skb->data;
 	pkt_len = le16_to_cpu(rx_pd->rx_pkt_length);
 	if (pkt_len < sizeof(struct ieee80211_hdr) + sizeof(pkt_len)) {
-		nxpwifi_dbg(priv->adapter, ERROR, "invalid rx_pkt_length");
+		nxpwifi_dbg(adapter, ERROR, "invalid rx_pkt_length");
 		return -EINVAL;
 	}
 
@@ -427,6 +428,8 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 	    (ieee80211_is_auth(ieee_hdr->frame_control) ||
 	     ieee80211_is_deauth(ieee_hdr->frame_control) ||
 	     ieee80211_is_disassoc(ieee_hdr->frame_control))) {
+		struct nxpwifi_rxinfo *rx_info;
+
 		if (ieee80211_is_auth(ieee_hdr->frame_control)) {
 			if (priv->auth_flag & HOST_MLME_AUTH_PENDING) {
 				if (priv->auth_alg != WLAN_AUTH_SAE) {
@@ -439,7 +442,7 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 				return 0;
 			}
 
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "auth: receive authentication from %pM\n",
 				    ieee_hdr->addr3);
 		} else {
@@ -447,40 +450,44 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 				return 0;
 
 			if (ieee80211_is_deauth(ieee_hdr->frame_control)) {
-				nxpwifi_dbg(priv->adapter, MSG,
+				nxpwifi_dbg(adapter, MSG,
 					    "auth: receive deauth from %pM\n",
 					    ieee_hdr->addr3);
 				priv->auth_flag = 0;
 				priv->auth_alg = WLAN_AUTH_NONE;
 			} else {
-				nxpwifi_dbg(priv->adapter, MSG,
+				nxpwifi_dbg(adapter, MSG,
 					    "assoc: receive disassoc from %pM\n",
 					    ieee_hdr->addr3);
 			}
 		}
 
-		cfg80211_rx_mlme_mgmt(priv->netdev, skb->data, pkt_len);
+		rx_info = NXPWIFI_SKB_RXCB(skb);
+		rx_info->pkt_len = pkt_len;
+		skb_queue_tail(&adapter->rx_mlme_q, skb);
+		nxpwifi_queue_work(adapter, &adapter->rx_mlme_work);
+		return -EINPROGRESS;
 	}
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP) {
 		if (ieee80211_is_auth(ieee_hdr->frame_control))
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "auth: receive auth from %pM\n",
 				    ieee_hdr->addr2);
 		if (ieee80211_is_deauth(ieee_hdr->frame_control))
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "auth: receive deauth from %pM\n",
 				    ieee_hdr->addr2);
 		if (ieee80211_is_disassoc(ieee_hdr->frame_control))
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "assoc: receive disassoc from %pM\n",
 				    ieee_hdr->addr2);
 		if (ieee80211_is_assoc_req(ieee_hdr->frame_control))
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "assoc: receive assoc req from %pM\n",
 				    ieee_hdr->addr2);
 		if (ieee80211_is_reassoc_req(ieee_hdr->frame_control))
-			nxpwifi_dbg(priv->adapter, MSG,
+			nxpwifi_dbg(adapter, MSG,
 				    "assoc: receive reassoc req from %pM\n",
 				    ieee_hdr->addr2);
 	}

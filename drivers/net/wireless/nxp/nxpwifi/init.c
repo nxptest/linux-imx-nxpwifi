@@ -419,8 +419,8 @@ void nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
 	spin_lock_init(&adapter->cmd_free_q_lock);
 	spin_lock_init(&adapter->cmd_pending_q_lock);
 	spin_lock_init(&adapter->scan_pending_q_lock);
-	spin_lock_init(&adapter->rx_proc_lock);
 
+	skb_queue_head_init(&adapter->rx_mlme_q);
 	skb_queue_head_init(&adapter->rx_data_q);
 	skb_queue_head_init(&adapter->tx_data_q);
 
@@ -609,6 +609,9 @@ nxpwifi_shutdown_drv(struct nxpwifi_adapter *adapter)
 		nxpwifi_write_data_complete(adapter, skb, 0, 0);
 
 	tasklet_disable(&adapter->rx_task);
+
+	while ((skb = skb_dequeue(&adapter->rx_mlme_q)))
+		dev_kfree_skb_any(skb);
 
 	while ((skb = skb_dequeue(&adapter->rx_data_q))) {
 		struct nxpwifi_rxinfo *rx_info = NXPWIFI_SKB_RXCB(skb);
