@@ -1203,9 +1203,20 @@ static void nxpwifi_host_mlme_work(struct work_struct *work)
 {
 	struct nxpwifi_adapter *adapter =
 		container_of(work, struct nxpwifi_adapter, host_mlme_work);
+	struct sk_buff *skb;
+	struct nxpwifi_rxinfo *rx_info;
+	struct nxpwifi_private *priv;
 
 	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
 		return;
+
+	while ((skb = skb_dequeue(&adapter->rx_mlme_q))) {
+		rx_info = NXPWIFI_SKB_RXCB(skb);
+		priv = adapter->priv[rx_info->bss_num];
+		cfg80211_rx_mlme_mgmt(priv->netdev,
+				      skb->data,
+				      rx_info->pkt_len);
+	}
 
 	/* Check for host mlme disconnection */
 	if (adapter->host_mlme_link_lost) {
@@ -1222,29 +1233,6 @@ static void nxpwifi_host_mlme_work(struct work_struct *work)
 	if (adapter->assoc_resp_received) {
 		nxpwifi_process_assoc_resp(adapter);
 		adapter->assoc_resp_received = false;
-	}
-}
-
-/* This is the rx mlme work function.
- * It handles rx mlme packets.
- */
-static void nxpwifi_rx_mlme_work(struct work_struct *work)
-{
-	struct nxpwifi_adapter *adapter =
-		container_of(work, struct nxpwifi_adapter, rx_mlme_work);
-	struct sk_buff *skb;
-	struct nxpwifi_rxinfo *rx_info;
-	struct nxpwifi_private *priv;
-
-	if (test_bit(NXPWIFI_SURPRISE_REMOVED, &adapter->work_flags))
-		return;
-
-	while ((skb = skb_dequeue(&adapter->rx_mlme_q))) {
-		rx_info = NXPWIFI_SKB_RXCB(skb);
-		priv = adapter->priv[rx_info->bss_num];
-		cfg80211_rx_mlme_mgmt(priv->netdev,
-				      skb->data,
-				      rx_info->pkt_len);
 	}
 }
 
@@ -1375,7 +1363,6 @@ nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter)
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
-	INIT_WORK(&adapter->rx_mlme_work, nxpwifi_rx_mlme_work);
 
 	/* Register the device. Fill up the private data structure with
 	 * relevant information from the card. Some code extracted from
@@ -1531,7 +1518,6 @@ nxpwifi_add_card(void *card, struct completion *fw_done,
 
 	INIT_WORK(&adapter->main_work, nxpwifi_main_work);
 	INIT_WORK(&adapter->host_mlme_work, nxpwifi_host_mlme_work);
-	INIT_WORK(&adapter->rx_mlme_work, nxpwifi_rx_mlme_work);
 
 	/* Register the device. Fill up the private data structure with relevant
 	 * information from the card.

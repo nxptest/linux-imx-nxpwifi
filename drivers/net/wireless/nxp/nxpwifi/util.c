@@ -465,7 +465,7 @@ nxpwifi_process_mgmt_packet(struct nxpwifi_private *priv,
 		rx_info = NXPWIFI_SKB_RXCB(skb);
 		rx_info->pkt_len = pkt_len;
 		skb_queue_tail(&adapter->rx_mlme_q, skb);
-		nxpwifi_queue_work(adapter, &adapter->rx_mlme_work);
+		nxpwifi_queue_work(adapter, &adapter->host_mlme_work);
 		return -EINPROGRESS;
 	}
 

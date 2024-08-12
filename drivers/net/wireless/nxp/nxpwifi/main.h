@@ -800,7 +800,6 @@ struct nxpwifi_adapter {
 	struct workqueue_struct *workqueue;
 	struct work_struct main_work;
 	struct work_struct host_mlme_work;
-	struct work_struct rx_mlme_work;
 	struct tasklet_struct rx_task;
 
 	/* spin lock for following variables which
