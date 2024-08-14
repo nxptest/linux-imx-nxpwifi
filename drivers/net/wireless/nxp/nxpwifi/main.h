@@ -926,6 +926,7 @@ struct nxpwifi_adapter {
 
 	bool ext_scan;
 	u8 fw_api_ver;
+	u8 fw_hotfix_ver;
 	u8 key_api_major_ver, key_api_minor_ver;
 	u8 max_sta_conn;
 	struct memory_type_mapping *mem_type_mapping_tbl;

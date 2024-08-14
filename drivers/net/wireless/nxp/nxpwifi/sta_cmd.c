@@ -101,9 +101,9 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 				switch (api_id) {
 				case KEY_API_VER_ID:
 					adapter->key_api_major_ver =
-							api_rev->major_ver;
+						api_rev->major_ver;
 					adapter->key_api_minor_ver =
-							api_rev->minor_ver;
+						api_rev->minor_ver;
 					nxpwifi_dbg(adapter, INFO,
 						    "key_api v%d.%d\n",
 						    adapter->key_api_major_ver,
@@ -111,7 +111,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 					break;
 				case FW_API_VER_ID:
 					adapter->fw_api_ver =
-							api_rev->major_ver;
+						api_rev->major_ver;
 					nxpwifi_dbg(adapter, INFO,
 						    "Firmware api version %d.%d\n",
 						    adapter->fw_api_ver,
@@ -130,6 +130,8 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 						    api_rev->minor_ver);
 					break;
 				case FW_HOTFIX_VER_ID:
+					adapter->fw_hotfix_ver =
+						api_rev->major_ver;
 					nxpwifi_dbg(adapter, INFO,
 						    "Firmware hotfix version %d\n",
 						    api_rev->major_ver);
