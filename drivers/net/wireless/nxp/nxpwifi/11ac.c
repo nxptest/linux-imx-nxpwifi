@@ -90,10 +90,10 @@ nxpwifi_fill_vht_cap_info(struct nxpwifi_private *priv,
 
 	if (bands & BAND_A)
 		vht_cap->vht_cap_info =
-				cpu_to_le32(adapter->usr_dot_11ac_dev_cap_a);
+			cpu_to_le32(adapter->usr_dot_11ac_dev_cap_a);
 	else
 		vht_cap->vht_cap_info =
-				cpu_to_le32(adapter->usr_dot_11ac_dev_cap_bg);
+			cpu_to_le32(adapter->usr_dot_11ac_dev_cap_bg);
 }
 
 void nxpwifi_fill_vht_cap_tlv(struct nxpwifi_private *priv,
@@ -176,7 +176,7 @@ int nxpwifi_cmd_append_11ac_tlv(struct nxpwifi_private *priv,
 		memset(vht_cap, 0, sizeof(*vht_cap));
 		vht_cap->header.type = cpu_to_le16(WLAN_EID_VHT_CAPABILITY);
 		vht_cap->header.len  =
-				cpu_to_le16(sizeof(struct ieee80211_vht_cap));
+			cpu_to_le16(sizeof(struct ieee80211_vht_cap));
 		memcpy((u8 *)vht_cap + sizeof(struct nxpwifi_ie_types_header),
 		       (u8 *)bss_desc->bcn_vht_cap,
 		       le16_to_cpu(vht_cap->header.len));
@@ -193,9 +193,9 @@ int nxpwifi_cmd_append_11ac_tlv(struct nxpwifi_private *priv,
 			vht_op = (struct nxpwifi_ie_types_vht_oper *)*buffer;
 			memset(vht_op, 0, sizeof(*vht_op));
 			vht_op->header.type =
-					cpu_to_le16(WLAN_EID_VHT_OPERATION);
+				cpu_to_le16(WLAN_EID_VHT_OPERATION);
 			vht_op->header.len  = cpu_to_le16(sizeof(*vht_op) -
-				      sizeof(struct nxpwifi_ie_types_header));
+				sizeof(struct nxpwifi_ie_types_header));
 			memcpy((u8 *)vht_op +
 				sizeof(struct nxpwifi_ie_types_header),
 			       (u8 *)bss_desc->bcn_vht_oper,
@@ -276,14 +276,14 @@ void nxpwifi_set_11ac_ba_params(struct nxpwifi_private *priv)
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP) {
 		priv->add_ba_param.tx_win_size =
-					   NXPWIFI_11AC_UAP_AMPDU_DEF_TXWINSIZE;
+			NXPWIFI_11AC_UAP_AMPDU_DEF_TXWINSIZE;
 		priv->add_ba_param.rx_win_size =
-					   NXPWIFI_11AC_UAP_AMPDU_DEF_RXWINSIZE;
+			NXPWIFI_11AC_UAP_AMPDU_DEF_RXWINSIZE;
 	} else {
 		priv->add_ba_param.tx_win_size =
-					   NXPWIFI_11AC_STA_AMPDU_DEF_TXWINSIZE;
+			NXPWIFI_11AC_STA_AMPDU_DEF_TXWINSIZE;
 		priv->add_ba_param.rx_win_size =
-					   NXPWIFI_11AC_STA_AMPDU_DEF_RXWINSIZE;
+			NXPWIFI_11AC_STA_AMPDU_DEF_RXWINSIZE;
 	}
 }
 

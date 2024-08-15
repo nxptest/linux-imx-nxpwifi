@@ -450,8 +450,8 @@ int nxpwifi_cmd_11n_addba_rsp_gen(struct nxpwifi_private *priv,
 	block_ack_param_set |= rx_win_size << BLOCKACKPARAM_WINSIZE_POS;
 	add_ba_rsp->block_ack_param_set = cpu_to_le16(block_ack_param_set);
 	win_size = (le16_to_cpu(add_ba_rsp->block_ack_param_set)
-					& IEEE80211_ADDBA_PARAM_BUF_SIZE_MASK)
-					>> BLOCKACKPARAM_WINSIZE_POS;
+		    & IEEE80211_ADDBA_PARAM_BUF_SIZE_MASK)
+		   >> BLOCKACKPARAM_WINSIZE_POS;
 	cmd_addba_req->block_ack_param_set = cpu_to_le16(block_ack_param_set);
 
 	nxpwifi_11n_create_rx_reorder_tbl(priv, cmd_addba_req->peer_mac_addr,
@@ -693,7 +693,7 @@ int nxpwifi_ret_11n_addba_resp(struct nxpwifi_private *priv,
 
 	nxpwifi_dbg(priv->adapter, CMD,
 		    "cmd: ADDBA RSP: %pM tid=%d ssn=%d win_size=%d\n",
-		add_ba_rsp->peer_mac_addr, tid, add_ba_rsp->ssn, win_size);
+		    add_ba_rsp->peer_mac_addr, tid, add_ba_rsp->ssn, win_size);
 
 	return 0;
 }
@@ -791,7 +791,7 @@ static void nxpwifi_update_ampdu_rxwinsize(struct nxpwifi_adapter *adapter,
 
 		if (adapter->coex_win_size && adapter->coex_rx_win_size)
 			priv->add_ba_param.rx_win_size =
-					adapter->coex_rx_win_size;
+				adapter->coex_rx_win_size;
 
 		if (rx_win_size != priv->add_ba_param.rx_win_size) {
 			if (!priv->media_connected)

@@ -323,7 +323,7 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 		memset(ht_cap, 0, sizeof(struct nxpwifi_ie_types_htcap));
 		ht_cap->header.type = cpu_to_le16(WLAN_EID_HT_CAPABILITY);
 		ht_cap->header.len =
-				cpu_to_le16(sizeof(struct ieee80211_ht_cap));
+			cpu_to_le16(sizeof(struct ieee80211_ht_cap));
 		memcpy((u8 *)ht_cap + sizeof(struct nxpwifi_ie_types_header),
 		       (u8 *)bss_desc->bcn_ht_cap,
 		       le16_to_cpu(ht_cap->header.len));
@@ -333,12 +333,12 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 		if (bss_desc->bcn_ht_oper) {
 			u8 ht_param = bss_desc->bcn_ht_oper->ht_param;
 			u8 radio =
-			nxpwifi_band_to_radio_type(bss_desc->bss_band);
+				nxpwifi_band_to_radio_type(bss_desc->bss_band);
 			int freq =
-			ieee80211_channel_to_frequency(bss_desc->channel,
-						       radio);
+				ieee80211_channel_to_frequency(bss_desc->channel,
+							       radio);
 			struct ieee80211_channel *chan =
-			ieee80211_get_channel(priv->adapter->wiphy, freq);
+				ieee80211_get_channel(priv->adapter->wiphy, freq);
 
 			switch (ht_param & IEEE80211_HT_PARAM_CHA_SEC_OFFSET) {
 			case IEEE80211_HT_PARAM_CHA_SEC_ABOVE:
