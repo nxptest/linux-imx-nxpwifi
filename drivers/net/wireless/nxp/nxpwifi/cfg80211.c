@@ -10,6 +10,7 @@
 #include "cmdevt.h"
 #include "11n.h"
 #include "wmm.h"
+#include "vendor.h"
 
 static const struct ieee80211_iface_limit nxpwifi_ap_sta_limits[] = {
 	{
@@ -3935,6 +3936,8 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 
 	if (adapter->fw_api_ver == NXPWIFI_FW_V15)
 		wiphy->features |= NL80211_FEATURE_SK_TX_STATUS;
+
+	nxpwifi_set_vendor_commands(wiphy);
 
 	/* Reserve space for nxpwifi specific private data for BSS */
 	wiphy->bss_priv_size = sizeof(struct nxpwifi_bss_priv);

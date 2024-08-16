@@ -1,0 +1,23 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * NXP Wireless LAN device driver: VENDOR
+ *
+ * Copyright 2011-2024 NXP
+ */
+
+#ifndef __NXPWIFI_VENDOR_H__
+#define __NXPWIFI_VENDOR_H__
+
+#define NXP_OUI	0x006037
+
+enum nxpwifi_vendor_commands {
+	NXPWIFI_VENDOR_CMD_HSCFG
+};
+
+enum nxpwifi_nl_attrs {
+	NXPWIFI_HSCFG,
+};
+
+void nxpwifi_set_vendor_commands(struct wiphy *wiphy);
+
+#endif /* __NXPWIFI_VENDOR_H__ */
