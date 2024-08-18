@@ -872,4 +872,6 @@ struct nxpwifi_11ax_cmd_cfg {
 	} param;
 };
 
+#define SLEEP_PERIOD_RESERVED_FF 0xFF
+
 #endif /* !_NXPWIFI_CFG_H_ */

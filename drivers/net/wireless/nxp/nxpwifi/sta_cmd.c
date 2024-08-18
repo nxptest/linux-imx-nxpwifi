@@ -2901,6 +2901,53 @@ nxpwifi_ret_sta_11ax_cmd(struct nxpwifi_private *priv,
 	return nxpwifi_ret_11ax_cmd(priv, resp, data_buf);
 }
 
+static int
+nxpwifi_cmd_sta_sleep_period(struct nxpwifi_private *priv,
+			     struct host_cmd_ds_command *cmd,
+			     u16 cmd_no, void *data_buf,
+			     u16 cmd_action, u32 cmd_type)
+{
+	struct host_cmd_ds_802_11_sleep_period *pcmd_sleep_pd = &cmd->params.sleep_pd;
+
+	cmd->command = cpu_to_le16(HOST_CMD_802_11_SLEEP_PERIOD);
+	cmd->size = cpu_to_le16(sizeof(struct host_cmd_ds_802_11_sleep_period) +
+				S_DS_GEN);
+	if (cmd_action == HOST_ACT_GEN_SET)
+		pcmd_sleep_pd->sleep_pd = cpu_to_le16(*(u16 *)data_buf);
+
+	pcmd_sleep_pd->action = cpu_to_le16(cmd_action);
+
+	return 0;
+}
+
+static int
+nxpwifi_ret_sleep_period(struct nxpwifi_private *priv,
+			 struct host_cmd_ds_command *resp,
+			 u16 cmdresp_no,
+			 void *data_buf)
+{
+	struct host_cmd_ds_802_11_sleep_period *pcmd_sleep_pd = &resp->params.sleep_pd;
+	u16 sleep_pd = 0;
+
+	sleep_pd = le16_to_cpu(pcmd_sleep_pd->sleep_pd);
+	if (data_buf)
+		memcpy(data_buf, &sleep_pd, sizeof(sleep_pd));
+	priv->adapter->sleep_period.period = sleep_pd;
+	priv->adapter->saved_sleep_period.period = sleep_pd;
+
+	priv->adapter->pps_uapsd_mode = false;
+	if (priv->adapter->sleep_period.period != 0 &&
+	    priv->adapter->sleep_period.period !=
+	    SLEEP_PERIOD_RESERVED_FF) {
+		priv->adapter->gen_null_pkt = true;
+	} else {
+		priv->adapter->delay_null_pkt = false;
+		priv->adapter->gen_null_pkt = false;
+	}
+
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3079,6 +3126,9 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_11AX_CMD,
 	.prepare_cmd = nxpwifi_cmd_sta_11ax_cmd,
 	.cmd_resp = nxpwifi_ret_sta_11ax_cmd},
+	{.cmd_no = HOST_CMD_802_11_SLEEP_PERIOD,
+	.prepare_cmd = nxpwifi_cmd_sta_sleep_period,
+	.cmd_resp = nxpwifi_ret_sleep_period},
 };
 
 /* This function prepares the commands before sending them to the firmware.

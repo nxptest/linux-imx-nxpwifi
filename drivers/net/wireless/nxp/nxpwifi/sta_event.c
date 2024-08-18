@@ -642,6 +642,9 @@ void nxpwifi_reset_connect_state(struct nxpwifi_private *priv, u16 reason_code,
 		return;
 
 	priv->media_connected = false;
+
+	adapter->sleep_period.period = adapter->saved_sleep_period.period;
+
 	nxpwifi_dbg(adapter, MSG,
 		    "info: successfully disconnected from %pM: reason code %d\n",
 		    priv->cfg_bssid, reason_code);

@@ -365,6 +365,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_802_11_EEPROM_ACCESS              0x0059
 #define HOST_CMD_802_11D_DOMAIN_INFO               0x005b
 #define HOST_CMD_802_11_KEY_MATERIAL               0x005e
+#define HOST_CMD_802_11_SLEEP_PERIOD               0x0068
 #define HOST_CMD_802_11_BG_SCAN_CONFIG             0x006b
 #define HOST_CMD_802_11_BG_SCAN_QUERY              0x006c
 #define HOST_CMD_WMM_GET_STATUS                    0x0071
@@ -2222,6 +2223,14 @@ struct host_cmd_11ax_cmd {
 	u8 val[];
 } __packed;
 
+/* HostCmd_DS_802_11_SLEEP_PERIOD */
+struct host_cmd_ds_802_11_sleep_period {
+       /** ACT_GET/ACT_SET */
+	__le16 action;
+       /** Sleep Period in msec */
+	__le16 sleep_pd;
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2294,6 +2303,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_add_station sta_info;
 		struct host_cmd_11ax_cfg ax_cfg;
 		struct host_cmd_11ax_cmd ax_cmd;
+		struct host_cmd_ds_802_11_sleep_period sleep_pd;
 	} params;
 } __packed;
 

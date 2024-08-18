@@ -878,6 +878,7 @@ struct nxpwifi_adapter {
 	u16 fw_bands;
 	u8 tx_lock_flag;
 	struct nxpwifi_sleep_period sleep_period;
+	struct nxpwifi_sleep_period saved_sleep_period;
 	u16 ps_mode;
 	u32 ps_state;
 	u8 need_to_wakeup;
@@ -1473,4 +1474,6 @@ void nxpwifi_dev_debugfs_remove(struct nxpwifi_private *priv);
 #endif
 int nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter);
 void nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter);
+int nxpwifi_set_sleep_pd(struct nxpwifi_private *priv, u16 action,
+			 int cmd_type, u16 *sleep_period);
 #endif /* !_NXPWIFI_MAIN_H_ */

@@ -10,6 +10,11 @@
 #include "vendor.h"
 #include "main.h"
 
+static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
+				      struct wireless_dev *wdev,
+				      const void *data,
+				      int data_len);
+
 static int nxpwifi_vendor_cmd_hscfg(struct wiphy *wiphy,
 				    struct wireless_dev *wdev,
 				     const void *data,
@@ -86,6 +91,47 @@ static int nxpwifi_vendor_cmd_hscfg(struct wiphy *wiphy,
 	return ret;
 }
 
+static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
+				      struct wireless_dev *wdev,
+				      const void *data,
+				      int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	u16 sleep_period;
+	int ret = 0;
+	struct sk_buff *resp;
+	const u8 *ptr = data;
+
+	if (ptr[0] == HOST_ACT_GEN_GET) {
+		ret = nxpwifi_set_sleep_pd(priv, HOST_ACT_GEN_GET,
+					   NXPWIFI_SYNC_CMD, &sleep_period);
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(u16));
+
+		if (!resp)
+			ret = -ENOMEM;
+
+		if (nla_put(resp, NXPWIFI_SLEEPPD,
+			    sizeof(sleep_period), &sleep_period)) {
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+	} else if (ptr[0] == HOST_ACT_GEN_SET) {
+		adapter->sleep_period.period = (ptr[2] << 8) | ptr[1];
+		ret = nxpwifi_set_sleep_pd(priv, HOST_ACT_GEN_SET,
+					   NXPWIFI_SYNC_CMD, &adapter->sleep_period.period);
+	} else {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Invlaid action\n");
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -96,7 +142,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		.doit = nxpwifi_vendor_cmd_hscfg,
 		.policy = VENDOR_CMD_RAW_DATA,
 	},
-
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_SLEEPPD,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_cmd_sleeppd,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
 };
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy)

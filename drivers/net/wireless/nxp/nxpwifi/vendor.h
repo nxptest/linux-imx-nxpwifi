@@ -11,11 +11,13 @@
 #define NXP_OUI	0x006037
 
 enum nxpwifi_vendor_commands {
-	NXPWIFI_VENDOR_CMD_HSCFG
+	NXPWIFI_VENDOR_CMD_HSCFG,
+	NXPWIFI_VENDOR_CMD_SLEEPPD
 };
 
 enum nxpwifi_nl_attrs {
 	NXPWIFI_HSCFG,
+	NXPWIFI_SLEEPPD,
 };
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy);

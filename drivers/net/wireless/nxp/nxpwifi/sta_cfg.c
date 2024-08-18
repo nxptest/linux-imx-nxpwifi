@@ -1313,3 +1313,11 @@ int nxpwifi_get_chan_info(struct nxpwifi_private *priv,
 				HOST_ACT_GEN_GET, 0, channel_band,
 				NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_sleep_pd(struct nxpwifi_private *priv, u16 action,
+			 int cmd_type, u16 *sleep_period)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_802_11_SLEEP_PERIOD,
+				action, 0, sleep_period,
+				cmd_type == NXPWIFI_SYNC_CMD);
+}
