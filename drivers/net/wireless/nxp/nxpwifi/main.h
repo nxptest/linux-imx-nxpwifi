@@ -1476,4 +1476,7 @@ int nxpwifi_reinit_sw(struct nxpwifi_adapter *adapter);
 void nxpwifi_shutdown_sw(struct nxpwifi_adapter *adapter);
 int nxpwifi_set_sleep_pd(struct nxpwifi_private *priv, u16 action,
 			 int cmd_type, u16 *sleep_period);
+int nxpwifi_set_clock_sync(struct nxpwifi_private *priv, u16 action,
+			   int cmd_type,
+			   void *buf);
 #endif /* !_NXPWIFI_MAIN_H_ */

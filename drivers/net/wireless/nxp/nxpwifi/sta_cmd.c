@@ -2948,6 +2948,92 @@ nxpwifi_ret_sleep_period(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int
+nxpwifi_cmd_clock_sync(struct nxpwifi_private *priv,
+		       struct host_cmd_ds_command *cmd,
+		       u16 cmd_no, void *data_buf,
+		       u16 cmd_action, u32 cmd_type)
+{
+	struct host_cmd_ds_gpio_tsf_latch_param_config *gpio_tsf_latch =
+						&cmd->params.gpio_tsf_latch;
+	u8 *tlv = NULL;
+	struct nxpwifi_ds_gpio_tsf_latch *cfg;
+	struct gpio_tsf_latch_config *gpio_tsf_latch_config;
+	struct gpio_tsf_latch_report *gpio_tsf_latch_report;
+	struct nxpwifi_ds_tsf_info *tsf_info;
+
+	cmd->command = cpu_to_le16(HOST_CMD_GPIO_TSF_LATCH_PARAM_CONFIG);
+	cmd->size = cpu_to_le16(sizeof(struct host_cmd_ds_gpio_tsf_latch_param_config) +
+							S_DS_GEN);
+	gpio_tsf_latch->action = cpu_to_le16(cmd_action);
+	if (cmd_action == HOST_ACT_GEN_SET) {
+		cfg = (struct nxpwifi_ds_gpio_tsf_latch *)data_buf;
+		tlv = (u8 *)gpio_tsf_latch->tlv_buf;
+		gpio_tsf_latch_config = (struct gpio_tsf_latch_config *)tlv;
+		gpio_tsf_latch_config->header.type =
+			cpu_to_le16(TLV_TYPE_GPIO_TSF_LATCH_CONFIG);
+		gpio_tsf_latch_config->header.len =
+			cpu_to_le16(sizeof(struct gpio_tsf_latch_config) -
+					sizeof(struct nxpwifi_ie_types_header));
+		gpio_tsf_latch_config->clock_sync_mode = cfg->mode;
+		gpio_tsf_latch_config->clock_sync_Role = cfg->role;
+		gpio_tsf_latch_config->clock_sync_gpio_pin_number = cfg->pin;
+		gpio_tsf_latch_config->clock_sync_gpio_level_toggle = cfg->level;
+		gpio_tsf_latch_config->clock_sync_gpio_pulse_width = cpu_to_le16(cfg->width);
+		cmd->size += sizeof(struct gpio_tsf_latch_config);
+		tlv += sizeof(struct gpio_tsf_latch_config);
+	} else if (cmd_action == HOST_ACT_GEN_GET) {
+		tsf_info = (struct nxpwifi_ds_tsf_info *)data_buf;
+		tlv = (u8 *)gpio_tsf_latch->tlv_buf;
+		gpio_tsf_latch_report = (struct gpio_tsf_latch_report *)tlv;
+		gpio_tsf_latch_report->header.type =
+			cpu_to_le16(TLV_TYPE_GPIO_TSF_LATCH_REPORT);
+		gpio_tsf_latch_report->header.len =
+			cpu_to_le16(sizeof(struct gpio_tsf_latch_report) -
+						sizeof(struct nxpwifi_ie_types_header));
+		gpio_tsf_latch_report->tsf_format = cpu_to_le16(tsf_info->tsf_format);
+		cmd->size += sizeof(struct gpio_tsf_latch_report);
+	}
+
+	return 0;
+}
+
+static int
+nxpwifi_ret_clock_sync(struct nxpwifi_private *priv,
+		       struct host_cmd_ds_command *resp,
+		       u16 cmdresp_no,
+		       void *data_buf)
+{
+	struct host_cmd_ds_gpio_tsf_latch_param_config *gpio_tsf_config =
+		&resp->params.gpio_tsf_latch;
+	struct nxpwifi_ie_types_header *tlv = NULL;
+	struct gpio_tsf_latch_report *gpio_tsf_latch_report;
+	struct nxpwifi_ds_tsf_info *tsf_info;
+
+	if (gpio_tsf_config->action == HOST_ACT_GEN_GET && data_buf) {
+		tsf_info = (struct nxpwifi_ds_tsf_info *)data_buf;
+		tlv = (struct nxpwifi_ie_types_header *)(gpio_tsf_config->tlv_buf);
+		gpio_tsf_latch_report = (struct gpio_tsf_latch_report *)tlv;
+	
+		tsf_info->tsf_format =
+		le16_to_cpu(gpio_tsf_latch_report->tsf_format);
+		tsf_info->tsf_info =
+					        le16_to_cpu(gpio_tsf_latch_report->tsf_info);
+		tsf_info->tsf =
+				        le64_to_cpu(gpio_tsf_latch_report->tsf);
+		tsf_info->tsf_offset =
+					        le16_to_cpu(gpio_tsf_latch_report->tsf_offset);
+		nxpwifi_dbg(priv->adapter, INFO,
+				    "Get GPIO TSF latch report : format=%d\n info=%d tsf=%llu offset=%d\n", tsf_info->tsf_format,
+						tsf_info->tsf_info,
+						tsf_info->tsf,
+						tsf_info->tsf_offset);
+	
+	}
+
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3129,6 +3215,9 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_802_11_SLEEP_PERIOD,
 	.prepare_cmd = nxpwifi_cmd_sta_sleep_period,
 	.cmd_resp = nxpwifi_ret_sleep_period},
+	{.cmd_no = HOST_CMD_GPIO_TSF_LATCH_PARAM_CONFIG,
+	.prepare_cmd = nxpwifi_cmd_clock_sync,
+	.cmd_resp = nxpwifi_ret_clock_sync},
 };
 
 /* This function prepares the commands before sending them to the firmware.

@@ -871,6 +871,20 @@ struct nxpwifi_11ax_cmd_cfg {
 		struct nxpwifi_11ax_llde_cmd llde_cfg;
 	} param;
 };
+struct nxpwifi_ds_gpio_tsf_latch {
+	u8  mode;
+	u8  role;
+	u8  pin;
+	u8  level;
+	u16 width;
+} __packed;
+
+struct nxpwifi_ds_tsf_info {
+	u16  tsf_format;
+	u16  tsf_info;
+	u64  tsf;
+	s32  tsf_offset;
+} __packed;
 
 #define SLEEP_PERIOD_RESERVED_FF 0xFF
 

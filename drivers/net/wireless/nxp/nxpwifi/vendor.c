@@ -132,6 +132,72 @@ static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
 	return ret;
 }
 
+static int nxpwifi_vendor_cmd_clocksync(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	struct nxpwifi_ds_gpio_tsf_latch *clocksync_cfg;
+	int ret = 0;
+	struct sk_buff *resp;
+	struct nxpwifi_ds_tsf_info *tsf_info;
+
+	if (data_len == 0)
+		return -EINVAL;
+
+	if (*(u8 *)data == HOST_ACT_GEN_GET) {
+		tsf_info = kzalloc(sizeof(*tsf_info), GFP_KERNEL);
+
+		nxpwifi_set_clock_sync(priv, HOST_ACT_GEN_GET, NXPWIFI_SYNC_CMD,
+				       (void *)tsf_info);
+
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(*tsf_info));
+
+		if (!resp)
+			return -ENOMEM;
+
+		if (nla_put(resp, NXPWIFI_TSF_REPORT,
+			    sizeof(*tsf_info),
+			    tsf_info)) {
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+		kfree(tsf_info);
+	} else if (*(u8 *)data == HOST_ACT_GEN_SET) {
+		const u16 *ptr = data + 5;
+
+		clocksync_cfg = kzalloc(sizeof(*clocksync_cfg), GFP_KERNEL);
+
+		if (data_len != 6) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "Wrong argument numbers: %d\n", data_len);
+			return -EINVAL;
+		}
+		clocksync_cfg->mode = *((u8 *)data + 1);
+		clocksync_cfg->role = *((u8 *)data + 2);
+		clocksync_cfg->pin = *((u8 *)data + 3);
+		clocksync_cfg->level = *((u8 *)data + 4);
+		clocksync_cfg->width = le16_to_cpu(get_unaligned(ptr));
+		nxpwifi_dbg(priv->adapter, INFO,
+				    "clocksync: mode %d role: %d pin: %d level: %d wodth: %d\n", clocksync_cfg->mode, clocksync_cfg->role, clocksync_cfg->pin, clocksync_cfg->level, clocksync_cfg->width );
+
+
+		nxpwifi_set_clock_sync(priv, HOST_ACT_GEN_SET, NXPWIFI_SYNC_CMD,
+				       (void *)clocksync_cfg);
+		kfree(clocksync_cfg);
+	} else {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Invlaid action\n");
+	}
+
+	return 0;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -149,6 +215,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_cmd_sleeppd,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_CLOCKSYNC,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_cmd_clocksync,
 		.policy = VENDOR_CMD_RAW_DATA,
 	},
 };

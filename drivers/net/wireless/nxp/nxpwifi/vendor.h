@@ -12,12 +12,14 @@
 
 enum nxpwifi_vendor_commands {
 	NXPWIFI_VENDOR_CMD_HSCFG,
-	NXPWIFI_VENDOR_CMD_SLEEPPD
+	NXPWIFI_VENDOR_CMD_SLEEPPD,
+	NXPWIFI_VENDOR_CMD_CLOCKSYNC
 };
 
 enum nxpwifi_nl_attrs {
 	NXPWIFI_HSCFG,
 	NXPWIFI_SLEEPPD,
+	NXPWIFI_TSF_REPORT
 };
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy);

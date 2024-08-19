@@ -218,6 +218,8 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_SAE_PWE_MODE       (PROPRIETARY_TLV_BASE_ID + 339)
 #define TLV_TYPE_6E_INBAND_FRAMES   (PROPRIETARY_TLV_BASE_ID + 345)
 #define TLV_TYPE_SECURE_BOOT_UUID   (PROPRIETARY_TLV_BASE_ID + 348)
+#define TLV_TYPE_GPIO_TSF_LATCH_CONFIG	(PROPRIETARY_TLV_BASE_ID + 340)
+#define TLV_TYPE_GPIO_TSF_LATCH_REPORT	(PROPRIETARY_TLV_BASE_ID + 341)
 
 #define NXPWIFI_TX_DATA_BUF_SIZE_2K 2048
 
@@ -417,6 +419,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_ADD_NEW_STATION                   0x025f
 #define HOST_CMD_11AX_CFG                          0x0266
 #define HOST_CMD_11AX_CMD                          0x026d
+#define HOST_CMD_GPIO_TSF_LATCH_PARAM_CONFIG	0x0278
 
 #define PROTOCOL_NO_SECURITY        0x01
 #define PROTOCOL_STATIC_WEP         0x02
@@ -2231,6 +2234,28 @@ struct host_cmd_ds_802_11_sleep_period {
 	__le16 sleep_pd;
 } __packed;
 
+struct gpio_tsf_latch_config {
+	struct nxpwifi_ie_types_header header;
+	u8  clock_sync_mode;
+	u8  clock_sync_Role;
+	u8  clock_sync_gpio_pin_number;
+	u8  clock_sync_gpio_level_toggle;
+	u16  clock_sync_gpio_pulse_width;
+} __packed;
+
+struct gpio_tsf_latch_report {
+	struct nxpwifi_ie_types_header header;
+	u16  tsf_format;
+	u16  tsf_info;
+	u64  tsf;
+	s32  tsf_offset;
+} __packed;
+
+struct host_cmd_ds_gpio_tsf_latch_param_config {
+	u16 action;
+	u8 tlv_buf[];
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2290,6 +2315,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_sta_deauth sta_deauth;
 		struct host_cmd_ds_sta_list sta_list;
 		struct host_cmd_11ac_vht_cfg vht_cfg;
+		struct host_cmd_ds_gpio_tsf_latch_param_config gpio_tsf_latch;
 		struct host_cmd_ds_coalesce_cfg coalesce_cfg;
 		struct host_cmd_ds_chan_rpt_req chan_rpt_req;
 		struct host_cmd_sdio_sp_rx_aggr_cfg sdio_rx_aggr_cfg;

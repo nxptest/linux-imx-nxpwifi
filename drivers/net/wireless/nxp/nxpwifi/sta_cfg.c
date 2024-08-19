@@ -1321,3 +1321,12 @@ int nxpwifi_set_sleep_pd(struct nxpwifi_private *priv, u16 action,
 				action, 0, sleep_period,
 				cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_clock_sync(struct nxpwifi_private *priv, u16 action,
+			   int cmd_type,
+			   void *buf)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_GPIO_TSF_LATCH_PARAM_CONFIG,
+							action, 0, buf,
+						    cmd_type == NXPWIFI_SYNC_CMD);
+}
