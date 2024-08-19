@@ -20,6 +20,11 @@ static int nxpwifi_vendor_cmd_hscfg(struct wiphy *wiphy,
 				     const void *data,
 				     int data_len);
 
+static int nxpwifi_vendor_cmd_hs_offload(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const void *data,
+					 int data_len);
+
 static int nxpwifi_vendor_cmd_hscfg(struct wiphy *wiphy,
 				    struct wireless_dev *wdev,
 				     const void *data,
@@ -198,6 +203,66 @@ static int nxpwifi_vendor_cmd_clocksync(struct wiphy *wiphy,
 	return 0;
 }
 
+static int nxpwifi_vendor_cmd_hs_offload(struct wiphy *wiphy,
+					 struct wireless_dev *wdev,
+					 const void *data,
+					 int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	int ret = 0;
+	struct sk_buff *resp;
+	u8 hs_offload_cfg = 0;
+
+	if (data_len == 0)
+		return -EINVAL;
+
+	if (*(u8 *)data == HOST_ACT_GEN_GET) {
+		if (priv->auto_arp)
+			hs_offload_cfg = HS_OFFLOAD_ARP;
+
+		if (priv->auto_ping)
+			hs_offload_cfg |= HS_OFFLOAD_PING;
+
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(hs_offload_cfg));
+
+		if (!resp)
+			return -ENOMEM;
+
+		if (nla_put(resp, NXPWIFI_HS_OFFLOAD,
+			    sizeof(hs_offload_cfg),
+			    &hs_offload_cfg)) {
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+
+	} else if (*(u8 *)data == HOST_ACT_GEN_SET) {
+		if (data_len != 2) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "Wrong argument numbers: %d\n", data_len);
+			return -EINVAL;
+		}
+
+		if (*((u8 *)data + 1) & HS_OFFLOAD_ARP)
+			priv->auto_arp = 1;
+		else
+			priv->auto_arp = 0;
+
+		if (*((u8 *)data + 1) & HS_OFFLOAD_PING)
+			priv->auto_ping = 1;
+		else
+			priv->auto_ping = 0;
+	} else {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Invlaid action\n");
+	}
+
+	return 0;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -224,6 +289,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_cmd_clocksync,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_HSOFFLD,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_cmd_hs_offload,
 		.policy = VENDOR_CMD_RAW_DATA,
 	},
 };

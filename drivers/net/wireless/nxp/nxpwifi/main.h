@@ -628,6 +628,7 @@ struct nxpwifi_private {
 	struct nxpwifi_user_scan_chan hidden_chan[NXPWIFI_USER_SCAN_CHAN_MAX];
 	u8 assoc_resp_ht_param;
 	bool ht_param_present;
+	bool auto_arp, auto_ping;
 };
 
 struct nxpwifi_tx_ba_stream_tbl {

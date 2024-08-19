@@ -2701,6 +2701,59 @@ static void nxpwifi_set_auto_arp_mef_entry(struct nxpwifi_private *priv,
 	mef_entry->filter[filt_num].filt_action = TYPE_AND;
 }
 
+static void nxpwifi_set_auto_ping_mef_entry(struct nxpwifi_private *priv,
+					    struct nxpwifi_mef_entry *mef_entry)
+{
+	int i, filt_num = 0, num_ipv4 = 0;
+	struct in_device *in_dev;
+	struct in_ifaddr *ifa;
+	__be32 ips[NXPWIFI_MAX_SUPPORTED_IPADDR];
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	mef_entry->mode = MEF_MODE_HOST_SLEEP;
+	mef_entry->action = MEF_ACTION_AUTO_PING;
+
+	/* Enable ARP offload feature */
+	memset(ips, 0, sizeof(ips));
+	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
+		if (adapter->priv[i]->netdev) {
+			in_dev = __in_dev_get_rtnl(adapter->priv[i]->netdev);
+			if (!in_dev)
+				continue;
+			ifa = rtnl_dereference(in_dev->ifa_list);
+			if (!ifa || !ifa->ifa_local)
+				continue;
+			ips[i] = ifa->ifa_local;
+			num_ipv4++;
+		}
+	}
+
+	for (i = 0; i < num_ipv4; i++) {
+		if (!ips[i])
+			continue;
+		mef_entry->filter[filt_num].repeat = 1;
+		memcpy(mef_entry->filter[filt_num].byte_seq,
+		       (u8 *)&ips[i], sizeof(ips[i]));
+		mef_entry->filter[filt_num].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] =
+			sizeof(ips[i]);
+		mef_entry->filter[filt_num].offset = 46;
+		mef_entry->filter[filt_num].filt_type = TYPE_EQ;
+		if (filt_num) {
+			mef_entry->filter[filt_num].filt_action =
+				TYPE_OR;
+		}
+		filt_num++;
+	}
+
+	mef_entry->filter[filt_num].repeat = 1;
+	mef_entry->filter[filt_num].byte_seq[0] = 0x08;
+	mef_entry->filter[filt_num].byte_seq[1] = 0x06;
+	mef_entry->filter[filt_num].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] = 2;
+	mef_entry->filter[filt_num].offset = 20;
+	mef_entry->filter[filt_num].filt_type = TYPE_EQ;
+	mef_entry->filter[filt_num].filt_action = TYPE_AND;
+}
+
 static int nxpwifi_set_wowlan_mef_entry(struct nxpwifi_private *priv,
 					struct nxpwifi_ds_mef_cfg *mef_cfg,
 					struct nxpwifi_mef_entry *mef_entry,
@@ -2787,9 +2840,14 @@ static int nxpwifi_set_wowlan_mef_entry(struct nxpwifi_private *priv,
 static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 				  struct cfg80211_wowlan *wowlan)
 {
-	int ret = 0, num_entries = 1;
+	int ret = 0, num_entries = 0;
 	struct nxpwifi_ds_mef_cfg mef_cfg;
-	struct nxpwifi_mef_entry *mef_entry;
+	struct nxpwifi_mef_entry *mef_entry, *pentry;
+
+	if (priv->auto_arp)
+		num_entries++;
+	if (priv->auto_ping)
+		num_entries++;
 
 	if (wowlan->n_patterns || wowlan->magic_pkt)
 		num_entries++;
@@ -2798,17 +2856,27 @@ static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 	if (!mef_entry)
 		return -ENOMEM;
 
+	pentry = mef_entry;
+
 	memset(&mef_cfg, 0, sizeof(mef_cfg));
 	mef_cfg.criteria |= NXPWIFI_CRITERIA_BROADCAST |
 		NXPWIFI_CRITERIA_UNICAST;
 	mef_cfg.num_entries = num_entries;
 	mef_cfg.mef_entry = mef_entry;
 
-	nxpwifi_set_auto_arp_mef_entry(priv, &mef_entry[0]);
+	if (priv->auto_arp) {
+		nxpwifi_set_auto_arp_mef_entry(priv, pentry);
+		pentry++;
+	}
+
+	if (priv->auto_ping) {
+		nxpwifi_set_auto_ping_mef_entry(priv, pentry);
+		pentry++;
+	}
 
 	if (wowlan->n_patterns || wowlan->magic_pkt) {
 		ret = nxpwifi_set_wowlan_mef_entry(priv, &mef_cfg,
-						   &mef_entry[1], wowlan);
+						   pentry, wowlan);
 		if (ret)
 			goto done;
 	}

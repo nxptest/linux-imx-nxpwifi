@@ -13,14 +13,19 @@
 enum nxpwifi_vendor_commands {
 	NXPWIFI_VENDOR_CMD_HSCFG,
 	NXPWIFI_VENDOR_CMD_SLEEPPD,
-	NXPWIFI_VENDOR_CMD_CLOCKSYNC
+	NXPWIFI_VENDOR_CMD_CLOCKSYNC,
+	NXPWIFI_VENDOR_CMD_HSOFFLD
 };
 
 enum nxpwifi_nl_attrs {
 	NXPWIFI_HSCFG,
 	NXPWIFI_SLEEPPD,
-	NXPWIFI_TSF_REPORT
+	NXPWIFI_TSF_REPORT,
+	NXPWIFI_HS_OFFLOAD
 };
+
+#define HS_OFFLOAD_ARP 0x1
+#define HS_OFFLOAD_PING 0x2
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy);
 

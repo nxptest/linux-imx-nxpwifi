@@ -609,6 +609,7 @@ enum nxpwifi_channel_flags {
 #define MEF_MODE_HOST_SLEEP			1
 #define MEF_ACTION_ALLOW_AND_WAKEUP_HOST	3
 #define MEF_ACTION_AUTO_ARP                    0x10
+#define MEF_ACTION_AUTO_PING                    0x20
 #define NXPWIFI_CRITERIA_BROADCAST	BIT(0)
 #define NXPWIFI_CRITERIA_UNICAST	BIT(1)
 #define NXPWIFI_CRITERIA_MULTICAST	BIT(3)
