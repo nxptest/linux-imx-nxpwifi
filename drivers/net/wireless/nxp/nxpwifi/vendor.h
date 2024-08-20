@@ -26,6 +26,7 @@ enum nxpwifi_nl_attrs {
 
 #define HS_OFFLOAD_ARP 0x1
 #define HS_OFFLOAD_PING 0x2
+#define HS_WAKEON_MDNS 0x4
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy);
 

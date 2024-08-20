@@ -2754,6 +2754,47 @@ static void nxpwifi_set_auto_ping_mef_entry(struct nxpwifi_private *priv,
 	mef_entry->filter[filt_num].filt_action = TYPE_AND;
 }
 
+static void nxpwifi_set_wake_on_mdns_mef_entry(struct nxpwifi_private *priv,
+					       struct nxpwifi_mef_entry *mef_entry)
+{
+	u16 pattern;
+
+	mef_entry->mode = MEF_MODE_HOST_SLEEP;
+	mef_entry->action = MEF_ACTION_ALLOW_AND_WAKEUP_HOST;
+
+	mef_entry->filter[0].repeat = 1;
+	mef_entry->filter[0].offset = 20;
+	mef_entry->filter[0].byte_seq[0] = 0x08;
+	mef_entry->filter[0].byte_seq[1] = 0x00;
+	mef_entry->filter[0].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] = 2;
+	mef_entry->filter[0].filt_action = TYPE_AND;
+	mef_entry->filter[0].filt_type = TYPE_EQ;
+
+	mef_entry->filter[1].repeat = 1;
+	mef_entry->filter[1].offset = 38;
+	memcpy(mef_entry->filter[1].byte_seq, "\xe0\x00\x00\xfb", min(4, NXPWIFI_MEF_MAX_BYTESEQ));
+	mef_entry->filter[1].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] = 4;
+	mef_entry->filter[1].filt_action = TYPE_AND;
+	mef_entry->filter[1].filt_type = TYPE_EQ;
+
+	mef_entry->filter[2].repeat = 1;
+	mef_entry->filter[2].offset = 31;
+	mef_entry->filter[2].byte_seq[0] = 17;
+	mef_entry->filter[2].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] = 1;
+	mef_entry->filter[2].filt_action = TYPE_AND;
+	mef_entry->filter[2].filt_type = TYPE_EQ;
+
+	mef_entry->filter[3].repeat = 1;
+	mef_entry->filter[3].offset = 44;
+	pattern = htons(5353);
+	memcpy(mef_entry->filter[3].byte_seq, &pattern, min_t(int, sizeof(u16),
+							      NXPWIFI_MEF_MAX_BYTESEQ));
+	mef_entry->filter[3].byte_seq[NXPWIFI_MEF_MAX_BYTESEQ] = min_t(int, sizeof(u16),
+								       NXPWIFI_MEF_MAX_BYTESEQ);
+	mef_entry->filter[3].filt_action = TYPE_AND;
+	mef_entry->filter[3].filt_type = TYPE_EQ;
+}
+
 static int nxpwifi_set_wowlan_mef_entry(struct nxpwifi_private *priv,
 					struct nxpwifi_ds_mef_cfg *mef_cfg,
 					struct nxpwifi_mef_entry *mef_entry,
@@ -2849,6 +2890,9 @@ static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 	if (priv->auto_ping)
 		num_entries++;
 
+	if (priv->wake_on_mdns)
+		num_entries++;
+
 	if (wowlan->n_patterns || wowlan->magic_pkt)
 		num_entries++;
 
@@ -2871,6 +2915,11 @@ static int nxpwifi_set_mef_filter(struct nxpwifi_private *priv,
 
 	if (priv->auto_ping) {
 		nxpwifi_set_auto_ping_mef_entry(priv, pentry);
+		pentry++;
+	}
+
+	if (priv->wake_on_mdns) {
+		nxpwifi_set_wake_on_mdns_mef_entry(priv, pentry);
 		pentry++;
 	}
 

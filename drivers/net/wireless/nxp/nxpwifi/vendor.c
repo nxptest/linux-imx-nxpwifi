@@ -255,6 +255,12 @@ static int nxpwifi_vendor_cmd_hs_offload(struct wiphy *wiphy,
 			priv->auto_ping = 1;
 		else
 			priv->auto_ping = 0;
+
+		if (*((u8 *)data + 1) & HS_WAKEON_MDNS)
+			priv->wake_on_mdns = 1;
+		else
+			priv->wake_on_mdns = 0;
+
 	} else {
 		nxpwifi_dbg(priv->adapter, ERROR,
 			    "Invlaid action\n");

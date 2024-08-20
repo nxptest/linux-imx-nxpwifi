@@ -145,6 +145,7 @@ int nxpwifi_init_priv(struct nxpwifi_private *priv)
 
 	priv->auto_arp = 0;
 	priv->auto_ping = 0;
+	priv->wake_on_mdns = 0;
 
 	return nxpwifi_add_bss_prio_tbl(priv);
 }
