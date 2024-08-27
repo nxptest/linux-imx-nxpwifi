@@ -1480,4 +1480,7 @@ int nxpwifi_set_sleep_pd(struct nxpwifi_private *priv, u16 action,
 int nxpwifi_set_clock_sync(struct nxpwifi_private *priv, u16 action,
 			   int cmd_type,
 			   void *buf);
+int nxpwifi_set_ind_rst(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+			struct nxpwifi_ds_independent_reset_cfg *ir_cfg);
 #endif /* !_NXPWIFI_MAIN_H_ */

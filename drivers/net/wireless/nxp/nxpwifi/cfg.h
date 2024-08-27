@@ -886,6 +886,11 @@ struct nxpwifi_ds_tsf_info {
 	s32  tsf_offset;
 } __packed;
 
+struct nxpwifi_ds_independent_reset_cfg {
+	u8 ir_mode;
+	u8 gpio_pin;
+};
+
 #define SLEEP_PERIOD_RESERVED_FF 0xFF
 
 #endif /* !_NXPWIFI_CFG_H_ */

@@ -1330,3 +1330,12 @@ int nxpwifi_set_clock_sync(struct nxpwifi_private *priv, u16 action,
 							action, 0, buf,
 						    cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_ind_rst(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+			struct nxpwifi_ds_independent_reset_cfg *ir_cfg)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_INDEPENDENT_RESET_CFG,
+							action, 0, ir_cfg,
+						    cmd_type == NXPWIFI_SYNC_CMD);
+}

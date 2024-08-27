@@ -415,6 +415,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_STA_CONFIGURE                     0x023f
 #define HOST_CMD_VDLL                              0x0240
 #define HOST_CMD_CHAN_REGION_CFG                   0x0242
+#define HOST_CMD_INDEPENDENT_RESET_CFG             0x0243
 #define HOST_CMD_PACKET_AGGR_CTRL                  0x0251
 #define HOST_CMD_ADD_NEW_STATION                   0x025f
 #define HOST_CMD_11AX_CFG                          0x0266
@@ -2257,6 +2258,12 @@ struct host_cmd_ds_gpio_tsf_latch_param_config {
 	u8 tlv_buf[];
 } __packed;
 
+struct host_cmd_ds_independent_reset_cfg {
+	u16 action;
+	u8 ir_mode;
+	u8 gpio_pin;
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2331,6 +2338,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_11ax_cfg ax_cfg;
 		struct host_cmd_11ax_cmd ax_cmd;
 		struct host_cmd_ds_802_11_sleep_period sleep_pd;
+		struct host_cmd_ds_independent_reset_cfg ind_rst_cfg;
 	} params;
 } __packed;
 

@@ -269,6 +269,60 @@ static int nxpwifi_vendor_cmd_hs_offload(struct wiphy *wiphy,
 	return 0;
 }
 
+static int nxpwifi_vendor_cmd_ind_reset(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data,
+					int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	struct nxpwifi_ds_independent_reset_cfg *ir_cfg;
+	int ret = 0;
+	struct sk_buff *resp;
+
+	if (data_len == 0)
+		return -EINVAL;
+
+	ir_cfg = kzalloc(sizeof(*ir_cfg), GFP_KERNEL);
+
+	if (*(u8 *)data == HOST_ACT_GEN_GET) {
+		nxpwifi_set_ind_rst(priv, HOST_ACT_GEN_GET, NXPWIFI_SYNC_CMD,
+				    ir_cfg);
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(*ir_cfg));
+
+		if (!resp)
+			return -ENOMEM;
+
+		if (nla_put(resp, NXPWIFI_INDRST_CFG,
+			    sizeof(*ir_cfg),
+			    ir_cfg)) {
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+
+	} else if (*(u8 *)data == HOST_ACT_GEN_SET) {
+		if (data_len != 3) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "Wrong argument numbers: %d\n", data_len);
+			return -EINVAL;
+		}
+		ir_cfg->ir_mode = *((u8 *)data + 1);
+		ir_cfg->gpio_pin = *((u8 *)data + 2);
+		nxpwifi_set_ind_rst(priv, HOST_ACT_GEN_SET, NXPWIFI_SYNC_CMD,
+				    ir_cfg);
+	} else {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Invlaid action\n");
+	}
+
+	kfree(ir_cfg);
+
+	return 0;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -304,6 +358,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_cmd_hs_offload,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_INDRST,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_cmd_ind_reset,
 		.policy = VENDOR_CMD_RAW_DATA,
 	},
 };

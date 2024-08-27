@@ -3034,6 +3034,53 @@ nxpwifi_ret_clock_sync(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int nxpwifi_cmd_ind_rst_cfg(struct nxpwifi_private *priv,
+				   struct host_cmd_ds_command *cmd,
+				   u16 cmd_no, void *data_buf,
+				   u16 cmd_action, u32 cmd_type)
+{
+	struct nxpwifi_ds_independent_reset_cfg *cfg =
+		(struct nxpwifi_ds_independent_reset_cfg *)data_buf;
+	struct host_cmd_ds_independent_reset_cfg *ind_rst_cfg =
+		(struct host_cmd_ds_independent_reset_cfg *)&cmd->params.ind_rst_cfg;
+
+	cmd->command = cpu_to_le16(HOST_CMD_INDEPENDENT_RESET_CFG);
+	cmd->size = cpu_to_le16(sizeof(*ind_rst_cfg) +
+				     S_DS_GEN);
+
+	ind_rst_cfg->action = cpu_to_le16(cmd_action);
+	if (cmd_action == HOST_ACT_GEN_SET) {
+		ind_rst_cfg->ir_mode = cfg->ir_mode;
+		ind_rst_cfg->gpio_pin = cfg->gpio_pin;
+	}
+
+	return 0;
+}
+
+static int nxpwifi_ret_ind_rst_cfg(struct nxpwifi_private *priv,
+				   struct host_cmd_ds_command *resp,
+				   u16 cmdresp_no,
+				   void *data_buf)
+{
+	struct nxpwifi_ds_independent_reset_cfg *cfg;
+
+	const struct host_cmd_ds_independent_reset_cfg *ind_rst_cfg =
+		(struct host_cmd_ds_independent_reset_cfg *)&resp->params.ind_rst_cfg;
+
+	if (data_buf) {
+		cfg = (struct nxpwifi_ds_independent_reset_cfg *)data_buf;
+
+		if (le16_to_cpu(ind_rst_cfg->action) ==
+		    HOST_ACT_GEN_GET) {
+			cfg->ir_mode = ind_rst_cfg->ir_mode;
+			cfg->gpio_pin =
+				ind_rst_cfg->gpio_pin;
+		}
+	}
+
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3218,6 +3265,9 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GPIO_TSF_LATCH_PARAM_CONFIG,
 	.prepare_cmd = nxpwifi_cmd_clock_sync,
 	.cmd_resp = nxpwifi_ret_clock_sync},
+	{.cmd_no = HOST_CMD_INDEPENDENT_RESET_CFG,
+	.prepare_cmd = nxpwifi_cmd_ind_rst_cfg,
+	.cmd_resp = nxpwifi_ret_ind_rst_cfg},
 };
 
 /* This function prepares the commands before sending them to the firmware.
