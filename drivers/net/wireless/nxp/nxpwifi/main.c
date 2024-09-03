@@ -1213,9 +1213,11 @@ static void nxpwifi_host_mlme_work(struct work_struct *work)
 	while ((skb = skb_dequeue(&adapter->rx_mlme_q))) {
 		rx_info = NXPWIFI_SKB_RXCB(skb);
 		priv = adapter->priv[rx_info->bss_num];
+		mutex_lock(&priv->wdev.mtx);
 		cfg80211_rx_mlme_mgmt(priv->netdev,
 				      skb->data,
 				      rx_info->pkt_len);
+		mutex_unlock(&priv->wdev.mtx);
 	}
 
 	/* Check for host mlme disconnection */

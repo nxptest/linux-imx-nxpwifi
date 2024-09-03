@@ -924,8 +924,10 @@ void nxpwifi_process_assoc_resp(struct nxpwifi_adapter *adapter)
 		assoc_resp.links[0].bss = priv->req_bss;
 		assoc_resp.buf = priv->assoc_rsp_buf;
 		assoc_resp.len = priv->assoc_rsp_size;
+		mutex_lock(&priv->wdev.mtx);
 		cfg80211_rx_assoc_resp(priv->netdev,
 				       &assoc_resp);
+		mutex_unlock(&priv->wdev.mtx);
 		priv->assoc_rsp_size = 0;
 	}
 }
