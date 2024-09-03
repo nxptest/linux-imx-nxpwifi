@@ -1729,37 +1729,13 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 {
 	struct nxpwifi_uap_bss_param *bss_cfg;
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
-	struct nxpwifi_adapter *adapter = priv->adapter;
-	struct nxpwifi_private *tmp_priv;
-	int i;
-	struct nxpwifi_current_bss_params *bss_params;
-	enum nl80211_band band;
-	int freq;
 	int ret;
 
 	if (GET_BSS_ROLE(priv) != NXPWIFI_BSS_ROLE_UAP)
 		return -EINVAL;
 
-	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
-		tmp_priv = adapter->priv[i];
-		if (tmp_priv == priv)
-			continue;
-		if (GET_BSS_ROLE(tmp_priv) == NXPWIFI_BSS_ROLE_STA &&
-		    tmp_priv->media_connected) {
-			bss_params = &tmp_priv->curr_bss_params;
-			band = nxpwifi_band_to_radio_type(bss_params->band);
-			freq = ieee80211_channel_to_frequency
-			       (bss_params->bss_descriptor.channel, band);
-			if (!ieee80211_channel_equal
-			     (params->chandef.chan,
-			      ieee80211_get_channel(wiphy, freq))) {
-				nxpwifi_dbg
-				(priv->adapter, MSG,
-				 "AP and STA must operate on same channel\n");
-				return -EOPNOTSUPP;
-			}
-		}
-	}
+	if (!nxpwifi_is_channel_setting_allowable(priv, params->chandef.chan))
+		return -EOPNOTSUPP;
 
 	bss_cfg = kzalloc(sizeof(*bss_cfg), GFP_KERNEL);
 	if (!bss_cfg)
@@ -3171,8 +3147,6 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 {
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
 	struct nxpwifi_adapter *adapter = priv->adapter;
-	struct nxpwifi_private *tmp_priv;
-	int i;
 	struct sk_buff *skb;
 	u16 pkt_len, auth_alg;
 	int ret;
@@ -3194,21 +3168,8 @@ nxpwifi_cfg80211_authenticate(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
-		tmp_priv = adapter->priv[i];
-		if (tmp_priv == priv)
-			continue;
-		if (GET_BSS_ROLE(tmp_priv) == NXPWIFI_BSS_ROLE_UAP &&
-		    netif_carrier_ok(tmp_priv->netdev) &&
-		    cfg80211_chandef_valid(&tmp_priv->bss_chandef)) {
-			if (!ieee80211_channel_equal
-			     (req->bss->channel, tmp_priv->bss_chandef.chan)) {
-				nxpwifi_dbg(adapter, MSG,
-					    "STA/AP must on the same channel\n");
-				return -EOPNOTSUPP;
-			}
-		}
-	}
+	if (!nxpwifi_is_channel_setting_allowable(priv, req->bss->channel))
+		return -EOPNOTSUPP;
 
 	if (priv->auth_alg != WLAN_AUTH_SAE &&
 	    (priv->auth_flag & HOST_MLME_AUTH_PENDING)) {

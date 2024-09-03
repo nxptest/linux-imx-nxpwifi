@@ -105,4 +105,17 @@ void nxpwifi_queue_delayed_work(struct nxpwifi_adapter *adapter,
 				struct delayed_work *dwork,
 				unsigned long delay);
 
+/* Current firmware doesn't support AP and STA running on different
+ * channels simultaneously in normal mode.
+ * FW crash would occur in such case.
+ * This function is used to check if check_chan can be set to FW or not.
+ *
+ * Return:
+ * %true if check_chan can be set to FW without issues.
+ * %false there is already other channel is set to FW, setting of
+ * check_chan is not allowable.
+ */
+bool nxpwifi_is_channel_setting_allowable(struct nxpwifi_private *priv,
+					  struct ieee80211_channel *check_chan);
+
 #endif /* !_NXPWIFI_UTIL_H_ */
