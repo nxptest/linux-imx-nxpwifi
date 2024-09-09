@@ -3081,6 +3081,45 @@ static int nxpwifi_ret_ind_rst_cfg(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int nxpwifi_cmd_csi(struct nxpwifi_private *priv,
+				   struct host_cmd_ds_command *cmd,
+				   u16 cmd_no, void *data_buf,
+				   u16 cmd_action, u32 cmd_type)
+{
+	struct host_cmd_ds_csi_cfg *csi_cfg_cmd = &cmd->params.csi_params;
+	struct nxpwifi_ds_csi_cfg *csi_params = NULL;
+
+	nxpwifi_dbg(priv->adapter, ERROR, "%s action %d\n", __FUNCTION__, cmd_action);
+	cmd->command = cpu_to_le16(HOST_CMD_CSI);
+	cmd->size = sizeof(*csi_cfg_cmd) + S_DS_GEN;
+	csi_cfg_cmd->action = cpu_to_le16(cmd_action);
+	switch (cmd_action) {
+	case HOST_ACT_CSI_ENABLE:
+		csi_params = (struct nxpwifi_ds_csi_cfg *)data_buf;
+		csi_cfg_cmd->head_id = cpu_to_le32(csi_params->head_id);
+		csi_cfg_cmd->tail_id = cpu_to_le32(csi_params->tail_id);
+		csi_cfg_cmd->chip_id = csi_params->chip_id;
+		csi_cfg_cmd->csi_filter_cnt = csi_params->csi_filter_cnt;
+		if (csi_cfg_cmd->csi_filter_cnt > CSI_FILTER_MAX)
+			csi_cfg_cmd->csi_filter_cnt = CSI_FILTER_MAX;
+		memcpy((u8 *)csi_cfg_cmd->csi_filter,
+			   (u8 *)csi_params->csi_filter,
+			   sizeof(struct nxpwifi_csi_filter) *
+				   csi_cfg_cmd->csi_filter_cnt);
+		
+		nxpwifi_dbg_dump(priv->adapter, CMD_D, "Enable CSI", csi_cfg_cmd, sizeof(*csi_cfg_cmd));
+		break;
+	case HOST_ACT_CSI_DISABLE:
+		nxpwifi_dbg_dump(priv->adapter, CMD_D, "Disable CSI", csi_cfg_cmd, sizeof(*csi_cfg_cmd));
+	default:
+		break;
+	}
+
+	cmd->size = cpu_to_le16(cmd->size);
+
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3268,6 +3307,9 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_INDEPENDENT_RESET_CFG,
 	.prepare_cmd = nxpwifi_cmd_ind_rst_cfg,
 	.cmd_resp = nxpwifi_ret_ind_rst_cfg},
+	{.cmd_no = HOST_CMD_CSI,
+	.prepare_cmd = nxpwifi_cmd_csi,
+	.cmd_resp = NULL},
 };
 
 /* This function prepares the commands before sending them to the firmware.

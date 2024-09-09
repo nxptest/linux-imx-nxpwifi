@@ -12,6 +12,7 @@
 #include "cmdevt.h"
 #include "wmm.h"
 #include "11n.h"
+#include <net/netlink.h>
 
 static struct nxpwifi_debug_data items[] = {
 	{"debug_mask", item_size(debug_mask),
@@ -951,6 +952,102 @@ int nxpwifi_process_vdll_event(struct nxpwifi_private *priv,
 	}
 
 	return ret;
+}
+
+static int nxpwifi_broadcast_event(struct nxpwifi_private *priv, u8 *payload, u32 len)
+{
+	int ret = 0;
+	struct sk_buff *skb = NULL;
+	struct nlmsghdr *nlh = NULL;
+	struct net_device *netdev = priv->netdev;
+	struct sock *sk = priv->nl_sk;
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	/* interface name to be prepended to event */
+    /* NL_MAX_PAYLOAD = 3 * 1024 */
+	if ((len + IFNAMSIZ) > NXPWIFI_NL_MAX_PAYLOAD) {
+		nxpwifi_dbg(adapter, ERROR, "event size is too big, len=%d\n", (int)len);
+		return -E2BIG;
+	}
+	if (sk) {
+		/* Allocate skb */
+		skb = alloc_skb(NLMSG_SPACE(len + IFNAMSIZ),
+			GFP_ATOMIC);
+		if (!skb) {
+			nxpwifi_dbg(adapter, ERROR,
+				"Could not allocate skb for netlink\n");
+			return -ENOMEM;
+		}
+		memset(skb->data, 0, NLMSG_SPACE(len + IFNAMSIZ));
+
+		nlh = (struct nlmsghdr *)skb->data;
+		nlh->nlmsg_len = NLMSG_SPACE(len + IFNAMSIZ);
+
+		/* From kernel */
+		nlh->nlmsg_pid = 0;
+		nlh->nlmsg_flags = 0;
+
+		/* Data */
+		skb_put(skb, nlh->nlmsg_len);
+		memcpy(NLMSG_DATA(nlh), netdev->name, IFNAMSIZ);
+		memcpy(((u8 *)(NLMSG_DATA(nlh))) + IFNAMSIZ, payload, len);
+
+		/* From Kernel */
+		NETLINK_CB(skb).portid = 0;
+
+		NETLINK_CB(skb).dst_group = NL_MULTICAST_GROUP;
+
+		/* Send message */
+		ret = netlink_broadcast(sk, skb, 0, NL_MULTICAST_GROUP,
+					GFP_ATOMIC);
+		if (ret) {
+			nxpwifi_dbg(adapter, ERROR, "netlink_broadcast failed: ret=%d\n",
+			       ret);
+			return ret;
+		}
+
+	} else {
+		nxpwifi_dbg(adapter, ERROR,
+		       "Could not send event through NETLINK. Link down.\n");
+		return -EBADF;
+	}
+
+	return 0;
+}
+
+int nxpwifi_process_csi_event(struct nxpwifi_private *priv, u8 *event_buf, u16 len)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+	int custom_len = 0;
+
+	struct csi_record_ds *csi_record;
+	u16 csi_sig;
+
+	csi_record = (struct csi_record_ds *)event_buf;
+	csi_sig = csi_record->CSI_Sign;
+
+	if (csi_sig != NXPWIFI_CSI_SIGNATURE) {
+		nxpwifi_dbg(adapter, ERROR, "Wrong CSI signature 0x%04x. Should be 0x%04x",
+				    csi_sig, NXPWIFI_CSI_SIGNATURE);
+		return -EINVAL;
+	} else {
+		nxpwifi_dbg_dump(priv->adapter, EVT_D, "CSI dump", csi_record, len);
+		//if (priv->csi_enable)
+		//	woal_cfg80211_event_csi_dump(priv, pmevent->event_buf,
+		//				     pmevent->event_len);
+		/* Send Netlink event */
+		custom_len = strlen(CUS_EVT_CSI) + sizeof(priv->csi_seq);
+		memmove(event_buf + custom_len, event_buf,
+			len);
+		memcpy(event_buf, CUS_EVT_CSI, strlen(CUS_EVT_CSI));
+		memcpy(event_buf + strlen(CUS_EVT_CSI), (u8 *)(&(priv->csi_seq)),
+				sizeof(priv->csi_seq));
+		nxpwifi_broadcast_event(priv, event_buf,
+				     custom_len + len);
+		priv->csi_seq++;
+	}
+	
+	return 0;
 }
 
 u64 nxpwifi_roc_cookie(struct nxpwifi_adapter *adapter)

@@ -10,6 +10,15 @@
 #include "vendor.h"
 #include "main.h"
 
+#if 0
+static const
+struct 
+. nxpwifi_vendor_attr_policy[NUM_WLCORE_VENDOR_ATTR] = {
+	[WLCORE_VENDOR_ATTR_FREQ]		= { .type = NLA_U32 },
+	[WLCORE_VENDOR_ATTR_GROUP_ID]		= { .type = NLA_U32 },
+};
+#endif
+
 static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
 				      struct wireless_dev *wdev,
 				      const void *data,
@@ -323,6 +332,85 @@ static int nxpwifi_vendor_cmd_ind_reset(struct wiphy *wiphy,
 	return 0;
 }
 
+static int nxpwifi_vendor_set_csi(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	struct nlattr *tb_vendor[NXPWIFI_ATTR_CSI_MAX + 1];
+	int ret = 0;
+	struct nxpwifi_ds_csi_cfg *csi_cfg;
+	const u8 *ptr = data;
+
+	nxpwifi_dbg(priv->adapter, ERROR, "%s dump data %x %x %x %x %x %x %d\n", __FUNCTION__, ptr[0], ptr[1], ptr[2], ptr[3], ptr[4], ptr[5], data_len);
+
+	if (data_len == 0)
+		return -EINVAL;
+
+	csi_cfg = kzalloc(sizeof(*csi_cfg), GFP_KERNEL);
+
+	if (csi_cfg == NULL) {
+		nxpwifi_dbg(priv->adapter, ERROR, "Could not allocate buffer for set CSI command!\n");
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	nla_parse(tb_vendor, NXPWIFI_ATTR_CSI_MAX, (struct nlattr *)data, data_len,
+			  NULL,
+			  NULL);
+
+	if (!tb_vendor[NXPWIFI_ATTR_CSI_CONFIG]) {
+		nxpwifi_dbg(priv->adapter, ERROR, "Could not find CSI CFG attr!\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
+	memcpy(csi_cfg,
+				(struct nxpwifi_ds_csi_cfg *)nla_data(
+					tb_vendor[NXPWIFI_ATTR_CSI_CONFIG]),
+				sizeof(*csi_cfg));
+
+	nxpwifi_dbg(priv->adapter, ERROR, "CSI configuration: csi_enable %d head_id %x tail_id %x csi_filter_cnt %d chip_id %x\n", csi_cfg->csi_enable,
+	csi_cfg->head_id, csi_cfg->tail_id, csi_cfg->csi_filter_cnt, csi_cfg->chip_id);
+
+	priv->csi_enable = csi_cfg->csi_enable;
+
+	if (priv->csi_enable == 1) {
+#if 0
+		if (tb_vendor[ATTR_CSI_DUMP_FORMAT])
+			priv->csi_dump_format =
+				nla_get_u8(tb_vendor[ATTR_CSI_DUMP_FORMAT]);
+#endif
+		ret = nxpwifi_set_csi_cfg(priv, HOST_ACT_CSI_ENABLE,
+			NXPWIFI_SYNC_CMD,
+			csi_cfg);
+
+	} else if (priv->csi_enable == 0) {		
+		if (!tb_vendor[NXPWIFI_ATTR_MAC_ADDR]) {
+			ret = -EFAULT;
+			goto done;
+		}
+		memset(csi_cfg, 0, sizeof(*csi_cfg));
+		memcpy(csi_cfg->csi_filter[0].mac_addr,
+			   (u8 *)nla_data(tb_vendor[NXPWIFI_ATTR_MAC_ADDR]),
+			   ETH_ALEN);
+		ret = nxpwifi_set_csi_cfg(priv, HOST_ACT_CSI_DISABLE,
+			NXPWIFI_SYNC_CMD,
+			csi_cfg);
+
+	}
+
+done:
+#if 0
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
+#endif
+	return ret;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -369,6 +457,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		.doit = nxpwifi_vendor_cmd_ind_reset,
 		.policy = VENDOR_CMD_RAW_DATA,
 	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_SETCSI,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_set_csi,
+		.policy = VENDOR_CMD_RAW_DATA,
+	}
 };
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy)

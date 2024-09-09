@@ -96,6 +96,8 @@ int nxpwifi_download_vdll_block(struct nxpwifi_adapter *adapter,
 int nxpwifi_process_vdll_event(struct nxpwifi_private *priv,
 			       struct sk_buff *skb);
 
+int nxpwifi_process_csi_event(struct nxpwifi_private *priv, u8 *event_buf, u16 len);
+
 u64 nxpwifi_roc_cookie(struct nxpwifi_adapter *adapter);
 
 void nxpwifi_queue_work(struct nxpwifi_adapter *adapter,

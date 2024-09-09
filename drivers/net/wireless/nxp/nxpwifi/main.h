@@ -629,6 +629,9 @@ struct nxpwifi_private {
 	u8 assoc_resp_ht_param;
 	bool ht_param_present;
 	bool auto_arp, auto_ping, wake_on_mdns;
+	u16 csi_enable;
+	u16 csi_seq;
+	struct sock *nl_sk;
 };
 
 struct nxpwifi_tx_ba_stream_tbl {
@@ -1483,4 +1486,7 @@ int nxpwifi_set_clock_sync(struct nxpwifi_private *priv, u16 action,
 int nxpwifi_set_ind_rst(struct nxpwifi_private *priv, u16 action,
 			int cmd_type,
 			struct nxpwifi_ds_independent_reset_cfg *ir_cfg);
+int nxpwifi_set_csi_cfg(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+			struct nxpwifi_ds_csi_cfg *csi_cfg);
 #endif /* !_NXPWIFI_MAIN_H_ */

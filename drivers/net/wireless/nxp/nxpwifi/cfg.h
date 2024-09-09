@@ -891,6 +891,41 @@ struct nxpwifi_ds_independent_reset_cfg {
 	u8 gpio_pin;
 };
 
+#define CSI_FILTER_MAX 16
+/** Structure of CSI filters */
+struct nxpwifi_csi_filter {
+	/** Source address of the packet to receive */
+	u8 mac_addr[ETH_ALEN];
+	/** Pakcet type of the interested CSI */
+	u8 pkt_type;
+	/* Packet subtype of the interested CSI */
+	u8 subtype;
+	/* Other filter flags */
+	u8 flags;
+} __packed;
+
+struct nxpwifi_ds_csi_cfg {
+	/** CSI enable flag. 1: enable, 0: disable */
+	u16 csi_enable;
+	/** Header ID*/
+	u32 head_id;
+	/** Tail ID */
+	u32 tail_id;
+	/** Number of CSI filters */
+	u8 csi_filter_cnt;
+	/** Chip ID */
+	u8 chip_id;
+	/** CSI filters */
+	struct nxpwifi_csi_filter csi_filter[CSI_FILTER_MAX];
+} __packed;
+
 #define SLEEP_PERIOD_RESERVED_FF 0xFF
+
+#define NXPWIFI_CSI_SIGNATURE 0xABCD
+#define CUS_EVT_CSI "EVENT=NXPWIFI_CSI"
+/** Netlink maximum payload size */
+#define NXPWIFI_NL_MAX_PAYLOAD          (3 * 1024)
+/** Netlink multicast group number */
+#define NL_MULTICAST_GROUP 1
 
 #endif /* !_NXPWIFI_CFG_H_ */

@@ -765,6 +765,16 @@ nxpwifi_process_cmdresp_error(struct nxpwifi_private *priv,
 			    "SDIO RX single-port aggregation Not support\n");
 		break;
 
+	case HOST_CMD_CSI:
+		if (resp->params.csi_params.action == HOST_ACT_CSI_ENABLE) {
+			priv->csi_enable = 1;
+			nxpwifi_dbg(adapter, MSG, "CSI ENABLE cmdresp\n");
+		} else {
+			priv->csi_enable = 0;
+			nxpwifi_dbg(adapter, MSG, "CSI DISABLE cmdresp\n");
+		}
+		break;
+
 	default:
 		break;
 	}

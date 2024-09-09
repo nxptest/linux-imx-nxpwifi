@@ -417,6 +417,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_CHAN_REGION_CFG                   0x0242
 #define HOST_CMD_INDEPENDENT_RESET_CFG             0x0243
 #define HOST_CMD_PACKET_AGGR_CTRL                  0x0251
+#define HOST_CMD_CSI                               0x025b
 #define HOST_CMD_ADD_NEW_STATION                   0x025f
 #define HOST_CMD_11AX_CFG                          0x0266
 #define HOST_CMD_11AX_CMD                          0x026d
@@ -456,6 +457,9 @@ enum nxpwifi_channel_flags {
 	NXPWIFI_CHANNEL_NOHT80 = BIT(3),
 	NXPWIFI_CHANNEL_DISABLED = BIT(7),
 };
+
+#define HOST_ACT_CSI_ENABLE 0x0001
+#define HOST_ACT_CSI_DISABLE 0x0002
 
 #define HOST_RET_BIT                       0x8000
 #define HOST_ACT_GEN_GET                   0x0000
@@ -583,7 +587,7 @@ enum nxpwifi_channel_flags {
 #define EVENT_TX_STATUS_REPORT		0x00000074
 #define EVENT_BT_COEX_WLAN_PARA_CHANGE	0X00000076
 #define EVENT_VDLL_IND			0x00000081
-
+#define EVENT_CSI                       0x008D
 
 #define EVENT_ID_MASK                   0xffff
 #define BSS_NUM_MASK                    0xf
@@ -2264,6 +2268,21 @@ struct host_cmd_ds_independent_reset_cfg {
 	u8 gpio_pin;
 } __packed;
 
+struct host_cmd_ds_csi_cfg {
+	/** Action */
+	u16 action;
+	/** Header ID*/
+	u32 head_id;
+	/** Tail ID */
+	u32 tail_id;
+	/** Number of CSI filters */
+	u8 csi_filter_cnt;
+	/** Chip ID */
+	u8 chip_id;
+	/** CSI filters */
+	struct nxpwifi_csi_filter csi_filter[CSI_FILTER_MAX];
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2339,6 +2358,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_11ax_cmd ax_cmd;
 		struct host_cmd_ds_802_11_sleep_period sleep_pd;
 		struct host_cmd_ds_independent_reset_cfg ind_rst_cfg;
+		struct host_cmd_ds_csi_cfg csi_params;
 	} params;
 } __packed;
 
@@ -2365,4 +2385,43 @@ struct vdll_ind_event {
 	__le16 block_len;
 } __packed;
 
+struct csi_record_ds {
+	/** Length in DWORDS, including header */
+	u16 Len;
+	/** CSI signature. 0xABCD fixed */
+	u16 CSI_Sign;
+	/** User defined HeaderID  */
+	u32 CSI_HeaderID;
+	/** Packet info field */
+	u16 PKT_info;
+	/** Frame control field for the received packet*/
+	u16 FCF;
+	/** Timestamp when packet received */
+	u64 TSF;
+	/** Received Packet Destination MAC Address */
+	u8 Dst_MAC[6];
+	/** Received Packet Source MAC Address */
+	u8 Src_MAC[6];
+	/** RSSI for antenna A */
+	u8 Rx_RSSI_A;
+	/** RSSI for antenna B */
+	u8 Rx_RSSI_B;
+	/** Noise floor for antenna A */
+	u8 Rx_NF_A;
+	/** Noise floor for antenna A */
+	u8 Rx_NF_B;
+	/** Rx signal strength above noise floor */
+	u8 Rx_SINR;
+	/** Channel */
+	u8 channel;
+	/** user defined Chip ID */
+	u16 chip_id;
+	/** Reserved */
+	u32 rsvd;
+	/** CSI data length in DWORDs */
+	u32 CSI_Data_Length;
+	/** Start of CSI data */
+	u8 CSI_Data[0];
+	/** At the end of CSI raw data, user defined TailID of 4 bytes*/
+} __packed;
 #endif /* !_NXPWIFI_FW_H_ */

@@ -1339,3 +1339,12 @@ int nxpwifi_set_ind_rst(struct nxpwifi_private *priv, u16 action,
 							action, 0, ir_cfg,
 						    cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_csi_cfg(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+			struct nxpwifi_ds_csi_cfg *csi_cfg)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_CSI,
+							action, 0, csi_cfg,
+						    cmd_type == NXPWIFI_SYNC_CMD);
+}

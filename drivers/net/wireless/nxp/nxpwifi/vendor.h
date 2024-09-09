@@ -15,7 +15,8 @@ enum nxpwifi_vendor_commands {
 	NXPWIFI_VENDOR_CMD_SLEEPPD,
 	NXPWIFI_VENDOR_CMD_CLOCKSYNC,
 	NXPWIFI_VENDOR_CMD_HSOFFLD,
-	NXPWIFI_VENDOR_CMD_INDRST
+	NXPWIFI_VENDOR_CMD_INDRST,
+	NXPWIFI_VENDOR_CMD_SETCSI
 };
 
 enum nxpwifi_nl_attrs {
@@ -24,6 +25,9 @@ enum nxpwifi_nl_attrs {
 	NXPWIFI_TSF_REPORT,
 	NXPWIFI_HS_OFFLOAD,
 	NXPWIFI_INDRST_CFG,
+	NXPWIFI_ATTR_CSI_CONFIG,
+	NXPWIFI_ATTR_MAC_ADDR,
+	NXPWIFI_ATTR_CSI_MAX
 };
 
 #define HS_OFFLOAD_ARP 0x1
@@ -31,5 +35,4 @@ enum nxpwifi_nl_attrs {
 #define HS_WAKEON_MDNS 0x4
 
 void nxpwifi_set_vendor_commands(struct wiphy *wiphy);
-
 #endif /* __NXPWIFI_VENDOR_H__ */

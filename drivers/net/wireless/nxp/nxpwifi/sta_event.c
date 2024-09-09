@@ -398,6 +398,15 @@ nxpwifi_sta_event_vdll_ind(struct nxpwifi_private *priv)
 	return nxpwifi_process_vdll_event(priv, adapter->event_skb);
 }
 
+static int
+nxpwifi_sta_csi_event(struct nxpwifi_private *priv)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	return nxpwifi_process_csi_event(priv, adapter->event_body,
+									 adapter->event_skb->len - sizeof(adapter->event_cause));
+}
+
 static const struct nxpwifi_evt_entry evt_table_sta[] = {
 	{.event_cause = EVENT_LINK_LOST,
 	.event_handler = nxpwifi_sta_event_link_lost},
@@ -491,6 +500,8 @@ static const struct nxpwifi_evt_entry evt_table_sta[] = {
 	.event_handler = NULL},
 	{.event_cause = EVENT_HOSTWAKE_STAIE,
 	.event_handler = NULL},
+	{.event_cause = EVENT_CSI,
+	.event_handler = nxpwifi_sta_csi_event},
 	{.event_cause = EVENT_UNKNOWN_DEBUG,
 	.event_handler = NULL},
 };
