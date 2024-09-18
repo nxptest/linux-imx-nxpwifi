@@ -134,6 +134,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 
 #define UAP_BSS_PARAMS_I            0
 #define UAP_CUSTOM_IE_I             1
+#define UAP_CHANNEL_SWITCH_I		2
 #define NXPWIFI_AUTO_IDX_MASK       0xffff
 #define NXPWIFI_DELETE_MASK         0x0000
 #define MGMT_MASK_ASSOC_REQ         0x01
@@ -220,6 +221,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_SECURE_BOOT_UUID   (PROPRIETARY_TLV_BASE_ID + 348)
 #define TLV_TYPE_GPIO_TSF_LATCH_CONFIG	(PROPRIETARY_TLV_BASE_ID + 340)
 #define TLV_TYPE_GPIO_TSF_LATCH_REPORT	(PROPRIETARY_TLV_BASE_ID + 341)
+#define TLV_TYPE_ACTION_CHAN_SWITCH_ANNOUNCE      (PROPRIETARY_TLV_BASE_ID + 342)
 
 #define NXPWIFI_TX_DATA_BUF_SIZE_2K 2048
 
@@ -2144,6 +2146,19 @@ struct nxpwifi_ie_list {
 	__le16 type;
 	__le16 len;
 	struct nxpwifi_ie ie_list[MAX_MGMT_IE_INDEX];
+} __packed;
+
+struct nxpwifi_action_chan_switch {
+	/** Header */
+	struct nxpwifi_ie_types_header header;
+    /* 0 send broadcast CSA action frame, 1 send unicast CSA action frame */
+	u8 mode ;
+	/* number of frame */
+	u8 num_pkt;
+	/** reserved */
+	u16 reserved;
+    /**ie buf*/
+    u8 ie_buf[];
 } __packed;
 
 struct coalesce_filt_field_param {

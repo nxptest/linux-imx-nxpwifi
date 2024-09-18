@@ -1489,4 +1489,7 @@ int nxpwifi_set_ind_rst(struct nxpwifi_private *priv, u16 action,
 int nxpwifi_set_csi_cfg(struct nxpwifi_private *priv, u16 action,
 			int cmd_type,
 			struct nxpwifi_ds_csi_cfg *csi_cfg);
+int nxpwifi_set_channel_switch(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+				struct nxpwifi_ds_chan_switch *chsw_cfg);
 #endif /* !_NXPWIFI_MAIN_H_ */

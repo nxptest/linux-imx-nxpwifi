@@ -1348,3 +1348,13 @@ int nxpwifi_set_csi_cfg(struct nxpwifi_private *priv, u16 action,
 							action, 0, csi_cfg,
 						    cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_channel_switch(struct nxpwifi_private *priv, u16 action,
+			int cmd_type,
+				struct nxpwifi_ds_chan_switch *chsw_cfg)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_UAP_SYS_CONFIG,
+				       action,
+				       UAP_CHANNEL_SWITCH_I, chsw_cfg,
+				       cmd_type == NXPWIFI_SYNC_CMD);
+}

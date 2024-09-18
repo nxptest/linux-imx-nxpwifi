@@ -358,6 +358,24 @@ struct wep_key {
 #define NXPWIFI_SUPPORTED_CHANNELS		2
 #define NXPWIFI_OPERATING_CLASSES		16
 
+struct nxpwifi_ds_chan_switch {
+	/** mode*/
+	u8 mode;
+	/** switch mode*/
+	u8 chan_switch_mode;
+	/** oper class*/
+	u8 new_oper_class;
+    /** new channel */
+    u8 new_channel_num;
+    /** chan_switch_count */
+    u8 chan_switch_count;
+	union {
+		u8 bandwidth;
+		u8 num_pkts;
+		u8 num_retry_pkts;
+	} bw_retry;
+} __packed;
+
 struct nxpwifi_uap_bss_param {
 	u8 mac_addr[ETH_ALEN];
 	u8 channel;
@@ -918,6 +936,9 @@ struct nxpwifi_ds_csi_cfg {
 	/** CSI filters */
 	struct nxpwifi_csi_filter csi_filter[CSI_FILTER_MAX];
 } __packed;
+
+#define NXPWIFI_MAX_NUM_PKTS    9
+#define NXPWIFI_DEF_NUM_PKTS    3
 
 #define SLEEP_PERIOD_RESERVED_FF 0xFF
 

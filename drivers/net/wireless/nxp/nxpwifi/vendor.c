@@ -411,6 +411,63 @@ done:
 	return ret;
 }
 
+static int nxpwifi_vendor_channel_switch(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_UAP);
+	struct nlattr *tb_vendor[NXPWIFI_ATTR_CSI_MAX + 1];
+	struct nxpwifi_ds_chan_switch *chsw_cfg;
+	int ret = 0;
+
+	if (priv->bss_type != NXPWIFI_BSS_TYPE_UAP) {
+		nxpwifi_dbg(priv->adapter, ERROR, "Please do channel switch on the AP interface.\n");
+		return -EINVAL;
+	}
+
+	if (data_len == 0)
+		return -EINVAL;
+
+	chsw_cfg = kzalloc(sizeof(*chsw_cfg), GFP_KERNEL);
+
+	if (chsw_cfg == NULL) {
+		return -ENOMEM;
+	}
+
+	nla_parse(tb_vendor, NXPWIFI_ATTR_CSI_MAX, (struct nlattr *)data, data_len,
+			  NULL,
+			  NULL);
+
+	if (!tb_vendor[NXPWIFI_ATTR_CHSWITCH]) {
+		nxpwifi_dbg(priv->adapter, ERROR, "Could not find channel switch attr!\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
+	memcpy(chsw_cfg,
+				(struct nxpwifi_ds_chan_switch *)nla_data(
+					tb_vendor[NXPWIFI_ATTR_CHSWITCH]),
+				sizeof(*chsw_cfg));
+
+	nxpwifi_dbg(priv->adapter, ERROR, "%s channel switch cfg mode %d chan_switch_mode %d new_oper_class %d new_channel_num %d chan_switch_count %d number of packets %d\n", __FUNCTION__, chsw_cfg->mode, chsw_cfg->chan_switch_mode, chsw_cfg->new_oper_class, chsw_cfg->new_channel_num, chsw_cfg->chan_switch_count, chsw_cfg->bw_retry.num_pkts);
+
+	if(!chsw_cfg->bw_retry.num_pkts)
+		chsw_cfg->bw_retry.num_pkts = NXPWIFI_DEF_NUM_PKTS;
+    else if (!chsw_cfg->mode)
+		chsw_cfg->bw_retry.num_pkts = min_t(u8, chsw_cfg->bw_retry.num_pkts, NXPWIFI_MAX_NUM_PKTS);
+
+	ret = nxpwifi_set_channel_switch(priv, HOST_ACT_GEN_SET, NXPWIFI_SYNC_CMD,
+				       chsw_cfg);
+done:
+	kfree(chsw_cfg);
+
+	return ret;
+
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -464,6 +521,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_set_csi,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_CHSWITCH,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_channel_switch,
 		.policy = VENDOR_CMD_RAW_DATA,
 	}
 };

@@ -378,6 +378,62 @@ static int nxpwifi_uap_custom_ie_prepare(u8 *tlv, void *cmd_buf, u16 *ie_size)
 	return 0;
 }
 
+static int nxpwifi_uap_channel_switch_prepare(u8 *tlv, void *cmd_buf, u16 *chsw_size)
+{
+	struct nxpwifi_ds_chan_switch *chsw_ie = (struct nxpwifi_ds_chan_switch *)cmd_buf;
+	struct nxpwifi_action_chan_switch *tlv_chan_switch = (struct nxpwifi_action_chan_switch *)tlv;
+	struct element *csa_elem, *ecsa_elem;
+	struct ieee80211_channel_sw_ie *csa = NULL;
+	struct ieee80211_ext_chansw_ie *ecsa = NULL;
+
+	if (!chsw_ie)
+		return -EINVAL;
+
+	tlv_chan_switch = (struct nxpwifi_action_chan_switch *)tlv;
+    tlv_chan_switch->header.type =
+				cpu_to_le16(TLV_TYPE_ACTION_CHAN_SWITCH_ANNOUNCE);
+    tlv_chan_switch->mode = chsw_ie->mode;
+	tlv_chan_switch->num_pkt = chsw_ie->bw_retry.num_pkts;
+
+	*chsw_size += sizeof(*tlv_chan_switch);
+
+	if(chsw_ie->new_oper_class){
+		tlv_chan_switch->header.len = cpu_to_le16(
+			sizeof(*tlv_chan_switch) -
+			sizeof(struct nxpwifi_ie_types_header) +
+                    sizeof(*ecsa_elem)
+					+ sizeof(*ecsa));
+		ecsa_elem = (struct element *)tlv_chan_switch->ie_buf;
+		ecsa_elem->id = WLAN_EID_EXT_CHANSWITCH_ANN;
+		ecsa_elem->datalen = sizeof(*ecsa);
+		ecsa = (struct ieee80211_ext_chansw_ie *)ecsa_elem->data;
+		ecsa->mode = chsw_ie->chan_switch_mode;
+		ecsa->count = 0;
+		ecsa->new_ch_num = chsw_ie->new_channel_num;
+		ecsa->new_operating_class = chsw_ie->new_oper_class;
+		*chsw_size += sizeof(*ecsa_elem);
+		*chsw_size += sizeof(*ecsa);
+	}
+	else {
+        tlv_chan_switch->header.len = cpu_to_le16(
+			sizeof(*tlv_chan_switch) -
+			sizeof(struct nxpwifi_ie_types_header) +
+                    sizeof(*csa_elem)
+					+ sizeof(*csa));
+		csa_elem = (struct element *)tlv_chan_switch->ie_buf;
+		csa_elem->id = WLAN_EID_CHANNEL_SWITCH;
+		csa_elem->datalen = sizeof(*csa);
+		csa = (struct ieee80211_channel_sw_ie *)csa_elem->data;
+		csa->mode = chsw_ie->chan_switch_mode;
+		csa->count = 0;
+		csa->new_ch_num = chsw_ie->new_channel_num;
+		*chsw_size += sizeof(*csa_elem);
+		*chsw_size += sizeof(*csa);
+	}
+
+	return 0;
+}
+
 /* Parse AP config structure and prepare TLV based command structure
  * to be sent to FW for uAP configuration
  */
@@ -388,7 +444,7 @@ nxpwifi_cmd_uap_sys_config(struct nxpwifi_private *priv,
 			   u16 cmd_action, u32 cmd_type)
 {
 	u8 *tlv;
-	u16 cmd_size, param_size, ie_size;
+	u16 cmd_size, param_size, ie_size, chsw_size;
 	struct host_cmd_ds_sys_config *sys_cfg;
 	int ret = 0;
 
@@ -412,6 +468,11 @@ nxpwifi_cmd_uap_sys_config(struct nxpwifi_private *priv,
 		if (ret)
 			return ret;
 		cmd->size = cpu_to_le16(ie_size);
+		break;
+	case UAP_CHANNEL_SWITCH_I:
+		chsw_size = cmd_size;
+		nxpwifi_uap_channel_switch_prepare(tlv, data_buf, &chsw_size);
+		cmd->size = cpu_to_le16(chsw_size);
 		break;
 	default:
 		return -EINVAL;
