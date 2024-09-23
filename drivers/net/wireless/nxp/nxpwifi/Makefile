@@ -13,6 +13,7 @@ nxpwifi-y += txrx.o
 nxpwifi-y += wmm.o
 nxpwifi-y += 11n.o
 nxpwifi-y += 11ac.o
+nxpwifi-y += 11ax.o
 nxpwifi-y += 11n_aggr.o
 nxpwifi-y += 11n_rxreorder.o
 nxpwifi-y += scan.o

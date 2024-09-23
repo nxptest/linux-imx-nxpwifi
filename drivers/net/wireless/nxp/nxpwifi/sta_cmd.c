@@ -14,6 +14,7 @@
 #include "wmm.h"
 #include "11n.h"
 #include "11ac.h"
+#include "11ax.h"
 
 static bool disable_auto_ds;
 
@@ -44,24 +45,23 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 	struct nxpwifi_ie_types_header *tlv;
 	struct hw_spec_api_rev *api_rev;
 	struct hw_spec_max_conn *max_conn;
+	struct hw_spec_extension *hw_he_cap;
+	struct hw_spec_fw_cap_info *fw_cap;
+	struct hw_spec_secure_boot_uuid *sb_uuid;
 	u16 resp_size, api_id;
 	int i, left_len, parsed_len = 0;
 
 	adapter->fw_cap_info = le32_to_cpu(hw_spec->fw_cap_info);
 
 	if (IS_SUPPORT_MULTI_BANDS(adapter))
-		adapter->fw_bands = (u8)GET_FW_DEFAULT_BANDS(adapter);
+		adapter->fw_bands = GET_FW_DEFAULT_BANDS(adapter);
 	else
 		adapter->fw_bands = BAND_B;
 
-	adapter->config_bands = adapter->fw_bands;
-
-	if (adapter->fw_bands & BAND_A) {
-		if (adapter->fw_bands & BAND_GN) {
-			adapter->config_bands |= BAND_AN;
-			adapter->fw_bands |= BAND_AN;
-		}
-	}
+	if ((adapter->fw_bands & BAND_A) && (adapter->fw_bands & BAND_GN))
+		adapter->fw_bands |= BAND_AN;
+	if (!(adapter->fw_bands & BAND_G) && (adapter->fw_bands & BAND_GN))
+		adapter->fw_bands &= ~BAND_GN;
 
 	adapter->fw_release_number = le32_to_cpu(hw_spec->fw_release_number);
 	adapter->fw_api_ver = (adapter->fw_release_number >> 16) & 0xff;
@@ -73,17 +73,17 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 
 		/* Copy 11AC cap */
 		adapter->hw_dot_11ac_dev_cap =
-					le32_to_cpu(hw_spec->dot_11ac_dev_cap);
+			le32_to_cpu(hw_spec->dot_11ac_dev_cap);
 		adapter->usr_dot_11ac_dev_cap_bg = adapter->hw_dot_11ac_dev_cap
-					& ~NXPWIFI_DEF_11AC_CAP_BF_RESET_MASK;
+			& ~NXPWIFI_DEF_11AC_CAP_BF_RESET_MASK;
 		adapter->usr_dot_11ac_dev_cap_a = adapter->hw_dot_11ac_dev_cap
-					& ~NXPWIFI_DEF_11AC_CAP_BF_RESET_MASK;
+			& ~NXPWIFI_DEF_11AC_CAP_BF_RESET_MASK;
 
 		/* Copy 11AC mcs */
 		adapter->hw_dot_11ac_mcs_support =
-				le32_to_cpu(hw_spec->dot_11ac_mcs_support);
+			le32_to_cpu(hw_spec->dot_11ac_mcs_support);
 		adapter->usr_dot_11ac_mcs_support =
-					adapter->hw_dot_11ac_mcs_support;
+			adapter->hw_dot_11ac_mcs_support;
 	} else {
 		adapter->is_hw_11ac_capable = false;
 	}
@@ -93,7 +93,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 		/* we have variable HW SPEC information */
 		left_len = resp_size - sizeof(struct host_cmd_ds_get_hw_spec);
 		while (left_len > sizeof(struct nxpwifi_ie_types_header)) {
-			tlv = (void *)&hw_spec->tlvs + parsed_len;
+			tlv = (void *)&hw_spec->tlv + parsed_len;
 			switch (le16_to_cpu(tlv->type)) {
 			case TLV_TYPE_API_REV:
 				api_rev = (struct hw_spec_api_rev *)tlv;
@@ -112,7 +112,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 				case FW_API_VER_ID:
 					adapter->fw_api_ver =
 						api_rev->major_ver;
-					nxpwifi_dbg(adapter, INFO,
+					nxpwifi_dbg(adapter, MSG,
 						    "Firmware api version %d.%d\n",
 						    adapter->fw_api_ver,
 						    api_rev->minor_ver);
@@ -149,6 +149,33 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 				nxpwifi_dbg(adapter, INFO,
 					    "max sta connections: %u\n",
 					    adapter->max_sta_conn);
+				break;
+			case TLV_TYPE_EXTENSION_ID:
+				hw_he_cap = (struct hw_spec_extension *)tlv;
+				if (hw_he_cap->ext_id ==
+				    WLAN_EID_EXT_HE_CAPABILITY)
+					nxpwifi_update_11ax_cap(adapter, hw_he_cap);
+				break;
+			case TLV_TYPE_FW_CAP_INFO:
+				fw_cap = (struct hw_spec_fw_cap_info *)tlv;
+				adapter->fw_cap_info =
+					le32_to_cpu(fw_cap->fw_cap_info);
+				adapter->fw_cap_ext =
+					le32_to_cpu(fw_cap->fw_cap_ext);
+				nxpwifi_dbg(adapter, INFO,
+					    "fw_cap_info:%#x fw_cap_ext:%#x\n",
+					    adapter->fw_cap_info,
+					    adapter->fw_cap_ext);
+				break;
+			case TLV_TYPE_SECURE_BOOT_UUID:
+				sb_uuid = (struct hw_spec_secure_boot_uuid *)tlv;
+				adapter->uuid_lo =
+					le64_to_cpu(sb_uuid->uuid_lo);
+				adapter->uuid_hi =
+					le64_to_cpu(sb_uuid->uuid_hi);
+				nxpwifi_dbg(adapter, INFO,
+					    "uuid: %#llx%#llx\n",
+					    adapter->uuid_lo, adapter->uuid_hi);
 				break;
 			default:
 				nxpwifi_dbg(adapter, FATAL,
@@ -195,6 +222,9 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 	adapter->hw_dot_11n_dev_cap = le32_to_cpu(hw_spec->dot_11n_dev_cap);
 	adapter->hw_dev_mcs_support = hw_spec->dev_mcs_support;
 	adapter->user_dev_mcs_support = adapter->hw_dev_mcs_support;
+	adapter->user_htstream = adapter->hw_dev_mcs_support;
+	if (adapter->fw_bands & BAND_A)
+		adapter->user_htstream |= (adapter->user_htstream << 8);
 
 	if (adapter->if_ops.update_mp_end_port) {
 		u16 mp_end_port;
@@ -205,6 +235,9 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 
 	if (adapter->fw_api_ver == NXPWIFI_FW_V15)
 		adapter->scan_chan_gap_enabled = true;
+
+	for (i = 0; i < adapter->priv_num; i++)
+		adapter->priv[i]->config_bands = adapter->fw_bands;
 
 	return 0;
 }
@@ -2039,7 +2072,7 @@ nxpwifi_cmd_sta_chan_report_request(struct nxpwifi_private *priv,
 }
 
 static int
-nxpwifi_cmf_sta_amsdu_aggr_ctrl(struct nxpwifi_private *priv,
+nxpwifi_cmd_sta_amsdu_aggr_ctrl(struct nxpwifi_private *priv,
 				struct host_cmd_ds_command *cmd,
 				u16 cmd_no, void *data_buf,
 				u16 cmd_action, u32 cmd_type)
@@ -2824,13 +2857,49 @@ nxpwifi_ret_sta_pkt_aggr_ctrl(struct nxpwifi_private *priv,
 		adapter->intf_hdr_len = INTF_HEADER_LEN;
 	adapter->bus_aggr.mode = NXPWIFI_BUS_AGGR_MODE_LEN_V2;
 	adapter->bus_aggr.tx_aggr_max_size =
-				le16_to_cpu(pkt_aggr_ctrl->tx_aggr_max_size);
+		le16_to_cpu(pkt_aggr_ctrl->tx_aggr_max_size);
 	adapter->bus_aggr.tx_aggr_max_num =
-				le16_to_cpu(pkt_aggr_ctrl->tx_aggr_max_num);
+		le16_to_cpu(pkt_aggr_ctrl->tx_aggr_max_num);
 	adapter->bus_aggr.tx_aggr_align =
-				le16_to_cpu(pkt_aggr_ctrl->tx_aggr_align);
+		le16_to_cpu(pkt_aggr_ctrl->tx_aggr_align);
 
 	return 0;
+}
+
+static int
+nxpwifi_cmd_sta_11ax_cfg(struct nxpwifi_private *priv,
+			 struct host_cmd_ds_command *cmd,
+			 u16 cmd_no, void *data_buf,
+			 u16 cmd_action, u32 cmd_type)
+{
+	return nxpwifi_cmd_11ax_cfg(priv, cmd, cmd_action, data_buf);
+}
+
+static int
+nxpwifi_ret_sta_11ax_cfg(struct nxpwifi_private *priv,
+			 struct host_cmd_ds_command *resp,
+			 u16 cmdresp_no,
+			 void *data_buf)
+{
+	return nxpwifi_ret_11ax_cfg(priv, resp, data_buf);
+}
+
+static int
+nxpwifi_cmd_sta_11ax_cmd(struct nxpwifi_private *priv,
+			 struct host_cmd_ds_command *cmd,
+			 u16 cmd_no, void *data_buf,
+			 u16 cmd_action, u32 cmd_type)
+{
+	return nxpwifi_cmd_11ax_cmd(priv, cmd, cmd_action, data_buf);
+}
+
+static int
+nxpwifi_ret_sta_11ax_cmd(struct nxpwifi_private *priv,
+			 struct host_cmd_ds_command *resp,
+			 u16 cmdresp_no,
+			 void *data_buf)
+{
+	return nxpwifi_ret_11ax_cmd(priv, resp, data_buf);
 }
 
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
@@ -2949,7 +3018,7 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	.prepare_cmd = nxpwifi_cmd_sta_chan_report_request,
 	.cmd_resp = NULL},
 	{.cmd_no = HOST_CMD_AMSDU_AGGR_CTRL,
-	.prepare_cmd = nxpwifi_cmf_sta_amsdu_aggr_ctrl,
+	.prepare_cmd = nxpwifi_cmd_sta_amsdu_aggr_ctrl,
 	.cmd_resp = NULL},
 	{.cmd_no = HOST_CMD_ROBUST_COEX,
 	.prepare_cmd = nxpwifi_cmd_sta_robust_coex,
@@ -3005,6 +3074,12 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_PACKET_AGGR_CTRL,
 	.prepare_cmd = nxpwifi_cmd_sta_pkt_aggr_ctrl,
 	.cmd_resp = nxpwifi_ret_sta_pkt_aggr_ctrl},
+	{.cmd_no = HOST_CMD_11AX_CFG,
+	.prepare_cmd = nxpwifi_cmd_sta_11ax_cfg,
+	.cmd_resp = nxpwifi_ret_sta_11ax_cfg},
+	{.cmd_no = HOST_CMD_11AX_CMD,
+	.prepare_cmd = nxpwifi_cmd_sta_11ax_cmd,
+	.cmd_resp = nxpwifi_ret_sta_11ax_cmd},
 };
 
 /* This function prepares the commands before sending them to the firmware.

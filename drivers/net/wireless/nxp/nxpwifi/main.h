@@ -346,11 +346,6 @@ struct nxpwifi_bssdescriptor {
 	u32 bss_mode;
 	u8 supported_rates[NXPWIFI_SUPPORTED_RATES];
 	u8 data_rates[NXPWIFI_SUPPORTED_RATES];
-	/* Network band.
-	 * BAND_B(0x01): 'b' band
-	 * BAND_G(0x02): 'g' band
-	 * BAND_A(0X04): 'a' band
-	 */
 	u16 bss_band;
 	u64 fw_tsf;
 	u64 timestamp;
@@ -358,7 +353,7 @@ struct nxpwifi_bssdescriptor {
 	struct ieee_types_cf_param_set cf_param_set;
 	u16 cap_info_bitmap;
 	struct ieee80211_wmm_param_ie wmm_ie;
-	u8  disable_11n;
+	u8 disable_11n;
 	struct ieee80211_ht_cap *bcn_ht_cap;
 	u16 ht_cap_offset;
 	struct ieee80211_ht_operation *bcn_ht_oper;
@@ -374,6 +369,11 @@ struct nxpwifi_bssdescriptor {
 	struct ieee_types_oper_mode_ntf *oper_mode;
 	u16 oper_mode_offset;
 	u8 disable_11ac;
+	struct ieee80211_he_cap_elem *bcn_he_cap;
+	u16 he_cap_offset;
+	struct ieee80211_he_operation *bcn_he_oper;
+	u16 he_info_offset;
+	u8 disable_11ax;
 	struct ieee_types_vendor_specific *bcn_wpa_ie;
 	u16 wpa_offset;
 	struct element *bcn_rsn_ie;
@@ -595,6 +595,13 @@ struct nxpwifi_private {
 	u16 gen_idx;
 	u8 ap_11n_enabled;
 	u8 ap_11ac_enabled;
+	u8 ap_11ax_enabled;
+	u16 config_bands;
+	/* 11AX */
+	u8 user_he_cap_len;
+	u8 user_he_cap[54];
+	u8 user_2g_he_cap_len;
+	u8 user_2g_he_cap[54];
 	bool host_mlme_reg;
 	u32 mgmt_frame_mask;
 	struct nxpwifi_roc_cfg roc_cfg;
@@ -686,7 +693,7 @@ struct cmd_ctrl_node {
 };
 
 struct nxpwifi_bss_priv {
-	u8 band;
+	u16 band;
 	u64 fw_tsf;
 };
 
@@ -711,6 +718,7 @@ struct nxpwifi_sta_node {
 	u8 is_wmm_enabled;
 	u8 is_11n_enabled;
 	u8 is_11ac_enabled;
+	u8 is_11ax_enabled;
 	u8 ampdu_sta[MAX_NUM_TID];
 	u16 rx_seq[MAX_NUM_TID];
 	u16 max_amsdu;
@@ -801,7 +809,6 @@ struct nxpwifi_adapter {
 	struct work_struct main_work;
 	struct work_struct host_mlme_work;
 	struct tasklet_struct rx_task;
-
 	/* spin lock for following variables which
 	 * are used to synchronize main process function
 	 */
@@ -814,7 +821,6 @@ struct nxpwifi_adapter {
 	 * by main process function
 	 */
 	u8 more_task_flag;
-
 	struct nxpwifi_bss_prio_tbl bss_prio_tbl[NXPWIFI_MAX_BSS_NUM];
 	u16 tx_buf_size;
 	u16 curr_tx_buf_size;
@@ -826,6 +832,10 @@ struct nxpwifi_adapter {
 	enum NXPWIFI_HARDWARE_STATUS hw_status;
 	u16 number_of_antenna;
 	u32 fw_cap_info;
+	u32 fw_cap_ext;
+	u16 user_htstream;
+	u64 uuid_lo;
+	u64 uuid_hi;
 	/* spin lock for interrupt handling */
 	spinlock_t int_lock;
 	u8 int_status;
@@ -867,8 +877,7 @@ struct nxpwifi_adapter {
 	u16 active_scan_time;
 	u16 passive_scan_time;
 	u16 scan_chan_gap_time;
-	u8 fw_bands;
-	u8 config_bands;
+	u16 fw_bands;
 	u8 tx_lock_flag;
 	struct nxpwifi_sleep_period sleep_period;
 	u16 ps_mode;
@@ -909,7 +918,6 @@ struct nxpwifi_adapter {
 	u16 max_mgmt_ie_index;
 	const struct firmware *cal_data;
 	struct device_node *dt_node;
-
 	/* 11AC */
 	u32 is_hw_11ac_capable;
 	u32 hw_dot_11ac_dev_cap;
@@ -917,13 +925,16 @@ struct nxpwifi_adapter {
 	u32 usr_dot_11ac_dev_cap_bg;
 	u32 usr_dot_11ac_dev_cap_a;
 	u32 usr_dot_11ac_mcs_support;
-
+	/* 11AX */
+	u8 is_hw_11ax_capable;
+	u8 hw_he_cap_len;
+	u8 hw_he_cap[54];
+	u8 hw_2g_he_cap_len;
+	u8 hw_2g_he_cap[54];
 	atomic_t pending_bridged_pkts;
-
 	/* For synchronizing FW initialization with device lifecycle. */
 	struct completion *fw_done;
 	bool is_up;
-
 	bool ext_scan;
 	u8 fw_api_ver;
 	u8 fw_hotfix_ver;
@@ -948,7 +959,6 @@ struct nxpwifi_adapter {
 	bool usb_mc_setup;
 	struct cfg80211_wowlan_nd_info *nd_info;
 	struct ieee80211_regdomain *regd;
-
 	/* Wake-on-WLAN (WoWLAN) */
 	int irq_wakeup;
 	bool wake_by_wifi;
@@ -957,9 +967,7 @@ struct nxpwifi_adapter {
 	/* Device dump data/length */
 	void *devdump_data;
 	int devdump_len;
-
 	bool ignore_btcoex_events;
-
 	struct vdll_dnld_ctrl vdll_ctrl;
 	u64 roc_cookie_counter;
 };
@@ -1069,7 +1077,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 				 struct nxpwifi_bssdescriptor *bss_desc);
 int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 				 struct host_cmd_ds_command *resp);
-u8 nxpwifi_band_to_radio_type(u8 band);
+u8 nxpwifi_band_to_radio_type(u16 config_bands);
 int nxpwifi_deauthenticate(struct nxpwifi_private *priv, u8 *mac);
 void nxpwifi_deauthenticate_all(struct nxpwifi_adapter *adapter);
 int nxpwifi_cmd_802_11_bg_scan_query(struct host_cmd_ds_command *cmd);
@@ -1415,9 +1423,6 @@ struct nxpwifi_sta_node *
 nxpwifi_add_sta_entry(struct nxpwifi_private *priv, const u8 *mac);
 struct nxpwifi_sta_node *
 nxpwifi_get_sta_entry(struct nxpwifi_private *priv, const u8 *mac);
-bool nxpwifi_is_bss_in_11ac_mode(struct nxpwifi_private *priv);
-u8 nxpwifi_get_center_freq_index(struct nxpwifi_private *priv, u8 band,
-				 u32 pri_chan, u8 chan_bw);
 int nxpwifi_init_channel_scan_gap(struct nxpwifi_adapter *adapter);
 
 int nxpwifi_cmd_issue_chan_report_request(struct nxpwifi_private *priv,
@@ -1460,7 +1465,7 @@ int nxpwifi_get_chan_info(struct nxpwifi_private *priv,
 			  struct nxpwifi_channel_band *channel_band);
 void nxpwifi_coex_ampdu_rxwinsize(struct nxpwifi_adapter *adapter);
 void nxpwifi_11n_delba(struct nxpwifi_private *priv, int tid);
-int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy);
+int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy, enum nl80211_band band);
 int nxpwifi_set_mac_address(struct nxpwifi_private *priv,
 			    struct net_device *dev,
 			    bool external, u8 *new_mac);

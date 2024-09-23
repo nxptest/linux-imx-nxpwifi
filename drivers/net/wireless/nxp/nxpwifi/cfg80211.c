@@ -492,14 +492,13 @@ nxpwifi_cfg80211_set_default_mgmt_key(struct wiphy *wiphy,
  *      - Country codes
  *      - Sub bands (first channel, number of channels, maximum Tx power)
  */
-int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
+int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy, enum nl80211_band band)
 {
 	u8 no_of_triplet = 0;
 	struct ieee80211_country_ie_triplet *t;
 	u8 no_of_parsed_chan = 0;
 	u8 first_chan = 0, next_chan = 0, max_pwr = 0;
 	u8 i, flag = 0;
-	enum nl80211_band band;
 	struct ieee80211_supported_band *sband;
 	struct ieee80211_channel *ch;
 	struct nxpwifi_adapter *adapter = nxpwifi_cfg80211_get_adapter(wiphy);
@@ -514,7 +513,6 @@ int nxpwifi_send_domain_info_cmd_fw(struct wiphy *wiphy)
 	domain_info->country_code[1] = adapter->country_code[1];
 	domain_info->country_code[2] = ' ';
 
-	band = nxpwifi_band_to_radio_type(adapter->config_bands);
 	if (!wiphy->bands[band]) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "11D: setting domain info in FW\n");
@@ -634,7 +632,10 @@ static void nxpwifi_reg_notifier(struct wiphy *wiphy,
 		memcpy(adapter->country_code, request->alpha2,
 		       sizeof(request->alpha2));
 		adapter->dfs_region = request->dfs_region;
-		nxpwifi_send_domain_info_cmd_fw(wiphy);
+		nxpwifi_send_domain_info_cmd_fw(wiphy, NL80211_BAND_2GHZ);
+		if (adapter->fw_bands & BAND_A)
+			nxpwifi_send_domain_info_cmd_fw(wiphy,
+							NL80211_BAND_5GHZ);
 		nxpwifi_dnld_txpwr_table(priv);
 	}
 }
@@ -1027,67 +1028,26 @@ errnotsupp:
 	return -EOPNOTSUPP;
 }
 
+#define RATE_FORMAT_LG  0
+#define RATE_FORMAT_HT  1
+#define RATE_FORMAT_VHT 2
+#define RATE_FORMAT_HE  3
+
 static void
 nxpwifi_parse_htinfo(struct nxpwifi_private *priv, u8 rateinfo, u8 htinfo,
 		     struct rate_info *rate)
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
+	u8 rate_format;
+	u8 he_dcm;
+	u8 stbc;
+	u8 gi;
+	u8 bw;
 
-	if (adapter->is_hw_11ac_capable) {
-		/* bit[1-0]: 00=LG 01=HT 10=VHT */
-		if (htinfo & BIT(0)) {
-			/* HT */
-			rate->mcs = rateinfo;
-			rate->flags |= RATE_INFO_FLAGS_MCS;
-		}
-		if (htinfo & BIT(1)) {
-			/* VHT */
-			rate->mcs = rateinfo & 0x0F;
-			rate->flags |= RATE_INFO_FLAGS_VHT_MCS;
-		}
+	rate_format = htinfo & 0x3;
 
-		if (htinfo & (BIT(1) | BIT(0))) {
-			/* HT or VHT */
-			switch (htinfo & (BIT(3) | BIT(2))) {
-			case 0:
-				rate->bw = RATE_INFO_BW_20;
-				break;
-			case (BIT(2)):
-				rate->bw = RATE_INFO_BW_40;
-				break;
-			case (BIT(3)):
-				rate->bw = RATE_INFO_BW_80;
-				break;
-			case (BIT(3) | BIT(2)):
-				rate->bw = RATE_INFO_BW_160;
-				break;
-			}
-
-			if (htinfo & BIT(4))
-				rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
-
-			if ((rateinfo >> 4) == 1)
-				rate->nss = 2;
-			else
-				rate->nss = 1;
-		}
-	} else {
-		/* Bit 0 in htinfo indicates that current rate is 11n. Valid
-		 * MCS index values for us are 0 to 15.
-		 */
-		if ((htinfo & BIT(0)) && rateinfo < 16) {
-			rate->mcs = rateinfo;
-			rate->flags |= RATE_INFO_FLAGS_MCS;
-			rate->bw = RATE_INFO_BW_20;
-			if (htinfo & BIT(1))
-				rate->bw = RATE_INFO_BW_40;
-			if (htinfo & BIT(2))
-				rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
-		}
-	}
-
-	/* Decode legacy rates for non-HT. */
-	if (!(htinfo & (BIT(0) | BIT(1)))) {
+	switch (rate_format) {
+	case RATE_FORMAT_LG:
 		/* Bitrates in multiples of 100kb/s. */
 		static const int legacy_rates[] = {
 			[0] = 10,
@@ -1106,7 +1066,62 @@ nxpwifi_parse_htinfo(struct nxpwifi_private *priv, u8 rateinfo, u8 htinfo,
 		};
 		if (rateinfo < ARRAY_SIZE(legacy_rates))
 			rate->legacy = legacy_rates[rateinfo];
+		break;
+	case RATE_FORMAT_HT:
+		rate->mcs = rateinfo;
+		rate->flags |= RATE_INFO_FLAGS_MCS;
+		break;
+	case RATE_FORMAT_VHT:
+		rate->mcs = rateinfo & 0xF;
+		rate->flags |= RATE_INFO_FLAGS_VHT_MCS;
+		break;
+	case RATE_FORMAT_HE:
+		rate->mcs = rateinfo & 0xF;
+		rate->flags |= RATE_INFO_FLAGS_HE_MCS;
+		he_dcm = 0; /* ToDo: ext_rate_info */
+		gi = (htinfo & BIT(4)) >> 4 |
+		     (htinfo & BIT(7)) >> 6;
+		stbc = (htinfo & BIT(5)) >> 5;
+		if (gi > 3) {
+			nxpwifi_dbg(adapter, ERROR, "Invalid gi value\n");
+			break;
+		}
+		if (gi == 3 && stbc && he_dcm) {
+			gi = 0;
+			stbc = 0;
+			he_dcm = 0;
+		}
+		if (gi > 0)
+			gi -= 1;
+		rate->he_gi = gi;
+		rate->he_dcm = he_dcm;
+		break;
 	}
+
+	bw = (htinfo & 0xC) >> 2;
+
+	switch (bw) {
+	case 0:
+		rate->bw = RATE_INFO_BW_20;
+		break;
+	case 1:
+		rate->bw = RATE_INFO_BW_40;
+		break;
+	case 2:
+		rate->bw = RATE_INFO_BW_80;
+		break;
+	case 3:
+		rate->bw = RATE_INFO_BW_160;
+		break;
+	}
+
+	if (rate_format != RATE_FORMAT_HE && (htinfo & BIT(4)))
+		rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
+
+	if ((rateinfo >> 4) == 1)
+		rate->nss = 2;
+	else
+		rate->nss = 1;
 }
 
 /* This function dumps the station information on a buffer.
@@ -1352,6 +1367,7 @@ static struct ieee80211_channel nxpwifi_channels_2ghz[] = {
 };
 
 static struct ieee80211_supported_band nxpwifi_band_2ghz = {
+	.band = NL80211_BAND_2GHZ,
 	.channels = nxpwifi_channels_2ghz,
 	.n_channels = ARRAY_SIZE(nxpwifi_channels_2ghz),
 	.bitrates = nxpwifi_rates,
@@ -1393,6 +1409,7 @@ static struct ieee80211_channel nxpwifi_channels_5ghz[] = {
 };
 
 static struct ieee80211_supported_band nxpwifi_band_5ghz = {
+	.band = NL80211_BAND_5GHZ,
 	.channels = nxpwifi_channels_5ghz,
 	.n_channels = ARRAY_SIZE(nxpwifi_channels_5ghz),
 	.bitrates = nxpwifi_rates + 4,
@@ -1729,6 +1746,7 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 {
 	struct nxpwifi_uap_bss_param *bss_cfg;
 	struct nxpwifi_private *priv = nxpwifi_netdev_get_priv(dev);
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	int ret;
 
 	if (GET_BSS_ROLE(priv) != NXPWIFI_BSS_ROLE_UAP)
@@ -1780,14 +1798,14 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 
 	ret = nxpwifi_set_secure_params(priv, bss_cfg, params);
 	if (ret) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "Failed to parse security parameters!\n");
 		goto done;
 	}
 
 	nxpwifi_set_ht_params(priv, bss_cfg, params);
 
-	if (priv->adapter->is_hw_11ac_capable) {
+	if (adapter->is_hw_11ac_capable) {
 		nxpwifi_set_vht_params(priv, bss_cfg, params);
 		nxpwifi_set_vht_width(priv, params->chandef.width,
 				      priv->ap_11ac_enabled);
@@ -1797,6 +1815,13 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 		nxpwifi_set_11ac_ba_params(priv);
 	else
 		nxpwifi_set_ba_params(priv);
+
+	if (adapter->is_hw_11ax_capable) {
+		priv->ap_11ax_enabled =
+			nxpwifi_check_11ax_capability(priv, bss_cfg, params);
+		if (priv->ap_11ax_enabled)
+			nxpwifi_set_11ax_status(priv, bss_cfg, params);
+	}
 
 	nxpwifi_set_wmm_params(priv, bss_cfg, params);
 
@@ -2069,23 +2094,6 @@ static int nxpwifi_cfg80211_sched_scan_stop(struct wiphy *wiphy,
 	return nxpwifi_stop_bg_scan(priv);
 }
 
-static void nxpwifi_setup_vht_caps(struct ieee80211_sta_vht_cap *vht_info,
-				   struct nxpwifi_private *priv)
-{
-	struct nxpwifi_adapter *adapter = priv->adapter;
-
-	vht_info->vht_supported = true;
-
-	vht_info->cap = adapter->hw_dot_11ac_dev_cap;
-	/* Update MCS support for VHT */
-	vht_info->vht_mcs.rx_mcs_map =
-		cpu_to_le16(adapter->hw_dot_11ac_mcs_support & 0xFFFF);
-	vht_info->vht_mcs.rx_highest = 0;
-	vht_info->vht_mcs.tx_mcs_map =
-		cpu_to_le16(adapter->hw_dot_11ac_mcs_support >> 16);
-	vht_info->vht_mcs.tx_highest = 0;
-}
-
 /* This function sets up the CFG802.11 specific HT capability fields
  * with default values.
  *
@@ -2098,8 +2106,8 @@ static void nxpwifi_setup_vht_caps(struct ieee80211_sta_vht_cap *vht_info,
  *      - MCD information, Tx parameters = IEEE80211_HT_MCS_TX_DEFINED (0x01)
  */
 static void
-nxpwifi_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
-		      struct nxpwifi_private *priv)
+nxpwifi_setup_ht_caps(struct nxpwifi_private *priv,
+		      struct ieee80211_sta_ht_cap *ht_info)
 {
 	int rx_mcs_supp;
 	struct ieee80211_mcs_info mcs_set;
@@ -2170,6 +2178,244 @@ nxpwifi_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
 	memcpy((u8 *)&ht_info->mcs, mcs, sizeof(struct ieee80211_mcs_info));
 
 	ht_info->mcs.tx_params = IEEE80211_HT_MCS_TX_DEFINED;
+}
+
+static void
+nxpwifi_setup_vht_caps(struct nxpwifi_private *priv,
+		       struct ieee80211_sta_vht_cap *vht_info)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	vht_info->vht_supported = true;
+
+	vht_info->cap = adapter->hw_dot_11ac_dev_cap;
+	/* Update MCS support for VHT */
+	vht_info->vht_mcs.rx_mcs_map =
+		cpu_to_le16(adapter->hw_dot_11ac_mcs_support & 0xFFFF);
+	vht_info->vht_mcs.rx_highest = 0;
+	vht_info->vht_mcs.tx_mcs_map =
+		cpu_to_le16(adapter->hw_dot_11ac_mcs_support >> 16);
+	vht_info->vht_mcs.tx_highest = 0;
+}
+
+/* ===============
+ * 11AX CAP for uAP
+ * ===============
+ * Note: bits not mentioned below are set to 0.
+ *
+ * 5G
+ * ===
+ * HE MAC Cap:
+ * Bit0:  1  (+HTC HE Support)
+ * Bit25: 1  (OM Control Support. But uAP does not support
+ *            Tx OM received from the STA, as it does not support UL OFDMA)
+ *
+ * HE PHY Cap:
+ * Bit1-7: 0x2 (Supported Channel Width Set.
+ *              Note it would be changed after 80+80 MHz is supported)
+ * Bit8-11: 0x3 (Punctured Preamble Rx.
+ *               Note: it would be changed after 80+80 MHz is supported)
+ * Bit12: 0x0 (Device Class)
+ * Bit13: 0x1 (LDPC coding in Payload)
+ * Bit17: 0x1 (NDP with 4xHE-LTF+3.2usGI)
+ * Bit18: 0x1 (STBC Tx <= 80 MHz)
+ * Bit19: 0x1 (STBC Rx <= 80 MHz)
+ * Bit20: 0x1 (Doppler Tx)
+ * Bit21: 0x1 (Doppler Rx)
+ * Bit24-25: 0x1 (DCM Max Constellation Tx)
+ * Bit27-28: 0x1 (DCM Max Constellation Rx)
+ * Bit31: 0x1 (SU Beamformer)
+ * Bit32: 0x1 (SU BeamFormee)
+ * Bit34-36: 0x7 (Beamformee STS <= 80 MHz)
+ * Bit40-42: 0x1 (Number of Sounding Dimentions <= 80 MHz)
+ * Bit53: 0x1 (Partial Bandwidth Extended Range)
+ * Bit55: 0x1 (PPE Threshold Present.
+ *             Note: PPE threshold may have some changes later)
+ * Bit58: 0x1 (HE SU PPDU and HE MU PPDU with 4xHE-LTF+0.8usGI)
+ * Bit59-61: 0x1 (Max Nc)
+ * Bit75: 0x1 (Rx 1024-QAM Support < 242-tone RU)
+ */
+
+#define UAP_HE_MAC_CAP0_MASK 0x06
+#define UAP_HE_MAC_CAP1_MASK 0x00
+#define UAP_HE_MAC_CAP2_MASK 0x10
+#define UAP_HE_MAC_CAP3_MASK 0x02
+#define UAP_HE_MAC_CAP4_MASK 0x00
+#define UAP_HE_MAC_CAP5_MASK 0x00
+#define UAP_HE_PHY_CAP0_MASK 0x04
+#define UAP_HE_PHY_CAP1_MASK 0x23
+#define UAP_HE_PHY_CAP2_MASK 0x3E
+#define UAP_HE_PHY_CAP3_MASK 0x89
+#define UAP_HE_PHY_CAP4_MASK 0x1D
+#define UAP_HE_PHY_CAP5_MASK 0x01
+#define UAP_HE_PHY_CAP6_MASK 0xA0
+#define UAP_HE_PHY_CAP7_MASK 0x0C
+#define UAP_HE_PHY_CAP8_MASK 0x00
+#define UAP_HE_PHY_CAP9_MASK 0x08
+#define UAP_HE_PHY_CAP10_MASK 0x00
+
+/* 2G
+ * ===
+ * HE MAC Cap:
+ * Bit0:  1  (+HTC HE Support)
+ * Bit25: 1  (OM Control Support. Note: uAP does not support
+ *            Tx OM received from the STA, as it does not support UL OFDMA)
+ *
+ * HE PHY Cap:
+ * Bit1-7: 0x1 (Supported Channel Width Set)
+ * Bit8-11: 0x0 (Punctured Preamble Rx)
+ * Bit12: 0x0 (Device Class)
+ * Bit13: 0x1 (LDPC coding in Payload)
+ * Bit17: 0x1 (NDP with 4xLTF+3.2usGI)
+ * Bit18: 0x1 (STBC Tx <= 80 MHz)
+ * Bit19: 0x1 (STBC Rx <= 80 MHz)
+ * Bit20: 0x1 (Doppler Tx)
+ * Bit21: 0x1 (Doppler Rx)
+ * Bit24-25: 0x1 (DCM Max Constellation Tx)
+ * Bit27-28: 0x1 (DCM Max Constellation Rx)
+ * Bit31: 0x1 (SU Beamformer)
+ * Bit32: 0x1 (SU BeamFormee)
+ * Bit34-36: 0x7 (Beamformee STS <= 80 MHz)
+ * Bit40-42: 0x1 (Number of Sounding Dimentions <= 80 MHz)
+ * Bit53: 0x1 (Partial Bandwidth Extended Range)
+ * Bit55: 0x1 (PPE Threshold Present.
+ *             Note: PPE threshold may have some changes later)
+ * Bit58: 0x1 (HE SU PPDU and HE MU PPDU with 4xHE-LTF+0.8usGI)
+ * Bit59-61: 0x1 (Max Nc)
+ * Bit75: 0x1 (Rx 1024-QAM Support < 242-tone RU)
+ */
+#define UAP_HE_2G_MAC_CAP0_MASK 0x00
+#define UAP_HE_2G_MAC_CAP1_MASK 0x00
+#define UAP_HE_2G_MAC_CAP2_MASK 0x00
+#define UAP_HE_2G_MAC_CAP3_MASK 0x02
+#define UAP_HE_2G_MAC_CAP4_MASK 0x00
+#define UAP_HE_2G_MAC_CAP5_MASK 0x00
+#define UAP_HE_2G_PHY_CAP0_MASK 0x02
+#define UAP_HE_2G_PHY_CAP1_MASK 0x20
+#define UAP_HE_2G_PHY_CAP2_MASK 0x3E
+#define UAP_HE_2G_PHY_CAP3_MASK 0x89
+#define UAP_HE_2G_PHY_CAP4_MASK 0x1D
+#define UAP_HE_2G_PHY_CAP5_MASK 0x01
+#define UAP_HE_2G_PHY_CAP6_MASK 0xA0
+#define UAP_HE_2G_PHY_CAP7_MASK 0x0C
+#define UAP_HE_2G_PHY_CAP8_MASK 0x00
+#define UAP_HE_2G_PHY_CAP9_MASK 0x08
+#define UAP_HE_2G_PHY_CAP10_MASK 0x00
+
+#define HE_CAP_FIX_SIZE 22
+
+static void
+nxpwifi_update_11ax_ie(u8 band,
+		       struct nxpwifi_11ax_he_cap_cfg *he_cap_cfg)
+{
+	if (band == BAND_A) {
+		he_cap_cfg->cap_elem.mac_cap_info[0] &= UAP_HE_MAC_CAP0_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[1] &= UAP_HE_MAC_CAP1_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[2] &= UAP_HE_MAC_CAP2_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[3] &= UAP_HE_MAC_CAP3_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[4] &= UAP_HE_MAC_CAP4_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[5] &= UAP_HE_MAC_CAP5_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[0] &= UAP_HE_PHY_CAP0_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[1] &= UAP_HE_PHY_CAP1_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[2] &= UAP_HE_PHY_CAP2_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[3] &= UAP_HE_PHY_CAP3_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[4] &= UAP_HE_PHY_CAP4_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[5] &= UAP_HE_PHY_CAP5_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[6] &= UAP_HE_PHY_CAP6_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[7] &= UAP_HE_PHY_CAP7_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[8] &= UAP_HE_PHY_CAP8_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[9] &= UAP_HE_PHY_CAP9_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[10] &= UAP_HE_PHY_CAP10_MASK;
+	} else {
+		he_cap_cfg->cap_elem.mac_cap_info[0] &= UAP_HE_2G_MAC_CAP0_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[1] &= UAP_HE_2G_MAC_CAP1_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[2] &= UAP_HE_2G_MAC_CAP2_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[3] &= UAP_HE_2G_MAC_CAP3_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[4] &= UAP_HE_2G_MAC_CAP4_MASK;
+		he_cap_cfg->cap_elem.mac_cap_info[5] &= UAP_HE_2G_MAC_CAP5_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[0] &= UAP_HE_2G_PHY_CAP0_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[1] &= UAP_HE_2G_PHY_CAP1_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[2] &= UAP_HE_2G_PHY_CAP2_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[3] &= UAP_HE_2G_PHY_CAP3_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[4] &= UAP_HE_2G_PHY_CAP4_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[5] &= UAP_HE_2G_PHY_CAP5_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[6] &= UAP_HE_2G_PHY_CAP6_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[7] &= UAP_HE_2G_PHY_CAP7_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[8] &= UAP_HE_2G_PHY_CAP8_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[9] &= UAP_HE_2G_PHY_CAP9_MASK;
+		he_cap_cfg->cap_elem.phy_cap_info[10] &= UAP_HE_2G_PHY_CAP10_MASK;
+	}
+}
+
+static void
+nxpwifi_setup_he_caps(struct nxpwifi_private *priv,
+		      struct ieee80211_supported_band *band)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+	struct ieee80211_sband_iftype_data *iftype_data;
+	struct nxpwifi_11ax_he_cap_cfg he_cap_cfg;
+	u8 hw_he_cap_len;
+	u8 extra_mcs_size;
+	int ppe_threshold_len;
+
+	if (band->band == NL80211_BAND_5GHZ) {
+		hw_he_cap_len = adapter->hw_he_cap_len;
+		memcpy(&he_cap_cfg, adapter->hw_he_cap, hw_he_cap_len);
+		nxpwifi_update_11ax_ie(BAND_A, &he_cap_cfg);
+	} else {
+		hw_he_cap_len = adapter->hw_2g_he_cap_len;
+		memcpy(&he_cap_cfg, adapter->hw_2g_he_cap, hw_he_cap_len);
+		nxpwifi_update_11ax_ie(BAND_G, &he_cap_cfg);
+	}
+
+	if (!hw_he_cap_len)
+		return;
+
+	iftype_data = kmalloc(sizeof(*iftype_data), GFP_KERNEL);
+	if (!iftype_data)
+		return;
+	memset(iftype_data, 0, sizeof(*iftype_data));
+
+	iftype_data->types_mask =
+		BIT(NL80211_IFTYPE_STATION) | BIT(NL80211_IFTYPE_AP);
+	iftype_data->he_cap.has_he = true;
+
+	memcpy(iftype_data->he_cap.he_cap_elem.mac_cap_info,
+	       he_cap_cfg.cap_elem.mac_cap_info,
+	       sizeof(he_cap_cfg.cap_elem.mac_cap_info));
+	memcpy(iftype_data->he_cap.he_cap_elem.phy_cap_info,
+	       he_cap_cfg.cap_elem.phy_cap_info,
+	       sizeof(he_cap_cfg.cap_elem.phy_cap_info));
+	memset(&iftype_data->he_cap.he_mcs_nss_supp,
+	       0xff,
+	       sizeof(iftype_data->he_cap.he_mcs_nss_supp));
+	memcpy(&iftype_data->he_cap.he_mcs_nss_supp,
+	       he_cap_cfg.he_txrx_mcs_support,
+	       sizeof(he_cap_cfg.he_txrx_mcs_support));
+
+	extra_mcs_size = 0;
+	/* Support 160Mhz */
+	if (he_cap_cfg.cap_elem.phy_cap_info[0] & BIT(3))
+		extra_mcs_size += 4;
+	/* Support 80+80 */
+	if (he_cap_cfg.cap_elem.phy_cap_info[0] & BIT(4))
+		extra_mcs_size += 4;
+	if (extra_mcs_size)
+		memcpy((u8 *)&iftype_data->he_cap.he_mcs_nss_supp.rx_mcs_160,
+		       he_cap_cfg.val, extra_mcs_size);
+
+	/* Support PPE threshold */
+	ppe_threshold_len = he_cap_cfg.len - HE_CAP_FIX_SIZE - extra_mcs_size;
+	if (he_cap_cfg.cap_elem.phy_cap_info[6] & BIT(7) && ppe_threshold_len) {
+		memcpy(iftype_data->he_cap.ppe_thres,
+		       &he_cap_cfg.val[extra_mcs_size],
+		       ppe_threshold_len);
+	} else {
+		iftype_data->he_cap.he_cap_elem.phy_cap_info[6] &= BIT(7);
+	}
+
+	band->n_iftype_data = 1;
+	band->iftype_data = iftype_data;
 }
 
 /*  create a new virtual interface with the given name and name assign type
@@ -2277,19 +2523,6 @@ struct wireless_dev *nxpwifi_add_virtual_intf(struct wiphy *wiphy,
 	ret = nxpwifi_sta_init_cmd(priv, false, false);
 	if (ret)
 		goto err_sta_init;
-
-	nxpwifi_setup_ht_caps(&wiphy->bands[NL80211_BAND_2GHZ]->ht_cap, priv);
-	if (adapter->is_hw_11ac_capable)
-		nxpwifi_setup_vht_caps
-		(&wiphy->bands[NL80211_BAND_2GHZ]->vht_cap, priv);
-
-	if (adapter->config_bands & BAND_A)
-		nxpwifi_setup_ht_caps
-		(&wiphy->bands[NL80211_BAND_5GHZ]->ht_cap, priv);
-
-	if ((adapter->config_bands & BAND_A) && adapter->is_hw_11ac_capable)
-		nxpwifi_setup_vht_caps
-		(&wiphy->bands[NL80211_BAND_5GHZ]->vht_cap, priv);
 
 	dev_net_set(dev, wiphy_net(wiphy));
 	dev->ieee80211_ptr = &priv->wdev;
@@ -2435,7 +2668,7 @@ static void nxpwifi_set_auto_arp_mef_entry(struct nxpwifi_private *priv,
 
 	/* Enable ARP offload feature */
 	memset(ips, 0, sizeof(ips));
-	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
+	for (i = 0; i < adapter->priv_num; i++) {
 		if (adapter->priv[i]->netdev) {
 			in_dev = __in_dev_get_rtnl(adapter->priv[i]->netdev);
 			if (!in_dev)
@@ -3551,7 +3784,7 @@ int nxpwifi_init_channel_scan_gap(struct nxpwifi_adapter *adapter)
 
 	n_channels_bg = nxpwifi_band_2ghz.n_channels;
 
-	if (adapter->config_bands & BAND_A)
+	if (adapter->fw_bands & BAND_A)
 		n_channels_a = nxpwifi_band_5ghz.n_channels;
 
 	/* allocate twice the number total channels, since the driver issues an
@@ -3580,6 +3813,8 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 	void *wdev_priv;
 	struct wiphy *wiphy;
 	struct nxpwifi_private *priv = adapter->priv[NXPWIFI_BSS_TYPE_STA];
+	struct ieee80211_sta_ht_cap *ht_cap;
+	struct ieee80211_sta_vht_cap *vht_cap;
 	u8 *country_code;
 	u32 thr, retry;
 
@@ -3601,10 +3836,34 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 				 BIT(NL80211_IFTYPE_AP);
 
 	wiphy->bands[NL80211_BAND_2GHZ] = &nxpwifi_band_2ghz;
-	if (adapter->config_bands & BAND_A)
+	if (adapter->fw_bands & BAND_A)
 		wiphy->bands[NL80211_BAND_5GHZ] = &nxpwifi_band_5ghz;
 	else
 		wiphy->bands[NL80211_BAND_5GHZ] = NULL;
+
+	ht_cap = &wiphy->bands[NL80211_BAND_2GHZ]->ht_cap;
+	nxpwifi_setup_ht_caps(priv, ht_cap);
+
+	if (adapter->is_hw_11ac_capable) {
+		vht_cap = &wiphy->bands[NL80211_BAND_2GHZ]->vht_cap;
+		nxpwifi_setup_vht_caps(priv, vht_cap);
+	}
+
+	if (adapter->is_hw_11ax_capable)
+		nxpwifi_setup_he_caps(priv, wiphy->bands[NL80211_BAND_2GHZ]);
+
+	if (adapter->fw_bands & BAND_A) {
+		ht_cap = &wiphy->bands[NL80211_BAND_5GHZ]->ht_cap;
+		nxpwifi_setup_ht_caps(priv, ht_cap);
+
+		if (adapter->is_hw_11ac_capable) {
+			vht_cap = &wiphy->bands[NL80211_BAND_5GHZ]->vht_cap;
+			nxpwifi_setup_vht_caps(priv, vht_cap);
+		}
+
+		if (adapter->is_hw_11ax_capable)
+			nxpwifi_setup_he_caps(priv, wiphy->bands[NL80211_BAND_5GHZ]);
+	}
 
 	if (adapter->is_hw_11ac_capable)
 		wiphy->iface_combinations = &nxpwifi_iface_comb_ap_sta_vht;

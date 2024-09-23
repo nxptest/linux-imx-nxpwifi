@@ -167,6 +167,10 @@ int nxpwifi_fill_new_bss_desc(struct nxpwifi_private *priv,
 	 * exist VHT_CAP IE in AP beacon
 	 */
 	bss_desc->disable_11ac = true;
+	/* Disable 11ax by default. Enable it only where there
+	 * exist HE_CAP IE in AP beacon
+	 */
+	bss_desc->disable_11ax = true;
 
 	if (bss_desc->cap_info_bitmap & WLAN_CAPABILITY_SPECTRUM_MGMT)
 		bss_desc->sensed_11h = true;
@@ -257,7 +261,7 @@ int nxpwifi_bss_start(struct nxpwifi_private *priv, struct cfg80211_bss *bss,
 	int ret;
 	struct nxpwifi_adapter *adapter = priv->adapter;
 	struct nxpwifi_bssdescriptor *bss_desc = NULL;
-	u8 config_bands;
+	u16 config_bands;
 
 	priv->scan_block = false;
 
@@ -281,10 +285,12 @@ int nxpwifi_bss_start(struct nxpwifi_private *priv, struct cfg80211_bss *bss,
 		config_bands = BAND_A | BAND_AN;
 		if (adapter->fw_bands & BAND_AAC)
 			config_bands |= BAND_AAC;
+		if (adapter->fw_bands & BAND_AAX)
+			config_bands |= BAND_AAX;
 	}
 
 	if (!((config_bands | adapter->fw_bands) & ~adapter->fw_bands))
-		adapter->config_bands = config_bands;
+		priv->config_bands = config_bands;
 
 	ret = nxpwifi_check_network_compatibility(priv, bss_desc);
 	if (ret)

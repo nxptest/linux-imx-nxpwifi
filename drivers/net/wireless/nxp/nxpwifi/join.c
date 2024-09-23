@@ -14,6 +14,7 @@
 #include "wmm.h"
 #include "11n.h"
 #include "11ac.h"
+#include "11ax.h"
 
 #define CAPINFO_MASK    (~(BIT(15) | BIT(14) | BIT(12) | BIT(11) | BIT(9)))
 
@@ -316,6 +317,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 				 struct host_cmd_ds_command *cmd,
 				 struct nxpwifi_bssdescriptor *bss_desc)
 {
+	struct nxpwifi_adapter *adapter = priv->adapter;
 	struct host_cmd_ds_802_11_associate *assoc = &cmd->params.associate;
 	struct nxpwifi_ie_types_host_mlme *host_mlme_tlv;
 	struct nxpwifi_ie_types_ssid_param_set *ssid_tlv;
@@ -395,7 +397,7 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 	rates_tlv->header.len = cpu_to_le16((u16)rates_size);
 	memcpy(rates_tlv->rates, rates, rates_size);
 	pos += sizeof(rates_tlv->header) + rates_size;
-	nxpwifi_dbg(priv->adapter, INFO, "info: ASSOC_CMD: rates size = %d\n",
+	nxpwifi_dbg(adapter, INFO, "info: ASSOC_CMD: rates size = %d\n",
 		    rates_size);
 
 	/* Add the Authentication type */
@@ -428,11 +430,11 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 		}
 	}
 
-	if (IS_SUPPORT_MULTI_BANDS(priv->adapter) &&
-	    !(ISSUPP_11NENABLED(priv->adapter->fw_cap_info) &&
+	if (IS_SUPPORT_MULTI_BANDS(adapter) &&
+	    !(ISSUPP_11NENABLED(adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n &&
-	    (priv->adapter->config_bands & BAND_GN ||
-	     priv->adapter->config_bands & BAND_AN) &&
+	    (priv->config_bands & BAND_GN ||
+	     priv->config_bands & BAND_AN) &&
 	    bss_desc->bcn_ht_cap)) {
 		/* Append a channel TLV for the channel the attempted AP was
 		 * found on
@@ -446,13 +448,13 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 		       sizeof(struct nxpwifi_chan_scan_param_set));
 		chan_tlv->chan_scan_param[0].chan_number =
 			(bss_desc->phy_param_set.ds_param_set.current_chan);
-		nxpwifi_dbg(priv->adapter, INFO, "info: Assoc: TLV Chan = %d\n",
+		nxpwifi_dbg(adapter, INFO, "info: Assoc: TLV Chan = %d\n",
 			    chan_tlv->chan_scan_param[0].chan_number);
 
 		chan_tlv->chan_scan_param[0].radio_type =
 			nxpwifi_band_to_radio_type((u8)bss_desc->bss_band);
 
-		nxpwifi_dbg(priv->adapter, INFO, "info: Assoc: TLV Band = %d\n",
+		nxpwifi_dbg(adapter, INFO, "info: Assoc: TLV Band = %d\n",
 			    chan_tlv->chan_scan_param[0].radio_type);
 		pos += sizeof(chan_tlv->header) +
 			sizeof(struct nxpwifi_chan_scan_param_set);
@@ -466,16 +468,20 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 			return -ENOMEM;
 	}
 
-	if (ISSUPP_11NENABLED(priv->adapter->fw_cap_info) &&
+	if (ISSUPP_11NENABLED(adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n &&
-	    (priv->adapter->config_bands & BAND_GN ||
-	     priv->adapter->config_bands & BAND_AN))
+	    (priv->config_bands & BAND_GN ||
+	     priv->config_bands & BAND_AN))
 		nxpwifi_cmd_append_11n_tlv(priv, bss_desc, &pos);
 
-	if (ISSUPP_11ACENABLED(priv->adapter->fw_cap_info) &&
+	if (ISSUPP_11ACENABLED(adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n && !bss_desc->disable_11ac &&
-	    priv->adapter->config_bands & BAND_AAC)
+	    priv->config_bands & BAND_AAC)
 		nxpwifi_cmd_append_11ac_tlv(priv, bss_desc, &pos);
+
+	if (ISSUPP_11AXENABLED(adapter->fw_cap_ext) &&
+	    nxpwifi_11ax_bandconfig_allowed(priv, bss_desc))
+		nxpwifi_cmd_append_11ax_tlv(priv, bss_desc, &pos);
 
 	/* Append vendor specific IE TLV */
 	nxpwifi_cmd_append_vsie_tlv(priv, NXPWIFI_VSIE_MASK_ASSOC, &pos);
@@ -497,11 +503,11 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 	/* Set the Capability info at last */
 	tmp_cap = bss_desc->cap_info_bitmap;
 
-	if (priv->adapter->config_bands == BAND_B)
+	if (priv->config_bands == BAND_B)
 		tmp_cap &= ~WLAN_CAPABILITY_SHORT_SLOT_TIME;
 
 	tmp_cap &= CAPINFO_MASK;
-	nxpwifi_dbg(priv->adapter, INFO,
+	nxpwifi_dbg(adapter, INFO,
 		    "info: ASSOC_CMD: tmp_cap=%4X CAPINFO_MASK=%4lX\n",
 		    tmp_cap, CAPINFO_MASK);
 	assoc->cap_info_bitmap = cpu_to_le16(tmp_cap);
@@ -602,7 +608,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	struct ieee80211_mgmt *hdr;
 
 	if (!priv->attempted_bss_desc) {
-		nxpwifi_dbg(priv->adapter, ERROR,
+		nxpwifi_dbg(adapter, ERROR,
 			    "%s: failed, association terminated by host\n",
 			    __func__);
 		goto done;
@@ -620,7 +626,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	aid = le16_to_cpu(assoc_rsp->a_id);
 
 	if ((aid & (BIT(15) | BIT(14))) != (BIT(15) | BIT(14)))
-		dev_err(priv->adapter->dev,
+		dev_err(adapter->dev,
 			"invalid AID value 0x%x; bits 15:14 not set\n",
 			aid);
 
@@ -633,23 +639,23 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	memcpy(priv->assoc_rsp_buf, &resp->params, priv->assoc_rsp_size);
 
 	if (status_code) {
-		priv->adapter->dbg.num_cmd_assoc_failure++;
-		nxpwifi_dbg(priv->adapter, ERROR,
+		adapter->dbg.num_cmd_assoc_failure++;
+		nxpwifi_dbg(adapter, ERROR,
 			    "ASSOC_RESP: failed,\t"
 			    "status code=%d err=%#x a_id=%#x\n",
 			    status_code, cap_info,
 			    le16_to_cpu(assoc_rsp->a_id));
 
-		nxpwifi_dbg(priv->adapter, ERROR, "assoc failure: reason %s\n",
+		nxpwifi_dbg(adapter, ERROR, "assoc failure: reason %s\n",
 			    assoc_failure_reason_to_str(cap_info));
 		if (cap_info == CONNECT_ERR_ASSOC_ERR_TIMEOUT) {
 			if (status_code == NXPWIFI_ASSOC_CMD_FAILURE_AUTH) {
 				ret = WLAN_STATUS_AUTH_TIMEOUT;
-				nxpwifi_dbg(priv->adapter, ERROR,
+				nxpwifi_dbg(adapter, ERROR,
 					    "ASSOC_RESP: AUTH timeout\n");
 			} else {
 				ret = WLAN_STATUS_UNSPECIFIED_FAILURE;
-				nxpwifi_dbg(priv->adapter, ERROR,
+				nxpwifi_dbg(adapter, ERROR,
 					    "ASSOC_RESP: UNSPECIFIED failure\n");
 			}
 
@@ -664,14 +670,14 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	/* Send a Media Connected event, according to the Spec */
 	priv->media_connected = true;
 
-	priv->adapter->ps_state = PS_STATE_AWAKE;
-	priv->adapter->pps_uapsd_mode = false;
-	priv->adapter->tx_lock_flag = false;
+	adapter->ps_state = PS_STATE_AWAKE;
+	adapter->pps_uapsd_mode = false;
+	adapter->tx_lock_flag = false;
 
 	/* Set the attempted BSSID Index to current */
 	bss_desc = priv->attempted_bss_desc;
 
-	nxpwifi_dbg(priv->adapter, INFO, "info: ASSOC_RESP: %s\n",
+	nxpwifi_dbg(adapter, INFO, "info: ASSOC_RESP: %s\n",
 		    bss_desc->ssid.ssid);
 
 	/* Make a copy of current BSSID descriptor */
@@ -715,7 +721,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 		priv->ht_param_present = false;
 	}
 
-	nxpwifi_dbg(priv->adapter, INFO,
+	nxpwifi_dbg(adapter, INFO,
 		    "info: ASSOC_RESP: curr_pkt_filter is %#x\n",
 		    priv->curr_pkt_filter);
 	if (priv->sec_info.wpa_enabled || priv->sec_info.wpa2_enabled)
@@ -735,7 +741,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	}
 
 	if (enable_data)
-		nxpwifi_dbg(priv->adapter, INFO,
+		nxpwifi_dbg(adapter, INFO,
 			    "info: post association, re-enabling data flow\n");
 
 	/* Reset SNR/NF/RSSI values */
@@ -752,9 +758,9 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 
 	nxpwifi_save_curr_bcn(priv);
 
-	priv->adapter->dbg.num_cmd_assoc_success++;
+	adapter->dbg.num_cmd_assoc_success++;
 
-	nxpwifi_dbg(priv->adapter, MSG, "assoc: associated with %pM\n",
+	nxpwifi_dbg(adapter, MSG, "assoc: associated with %pM\n",
 		    priv->attempted_bss_desc->mac_address);
 
 	/* Add the ra_list here for infra mode as there will be only 1 ra
@@ -802,7 +808,7 @@ int nxpwifi_associate(struct nxpwifi_private *priv,
 
 	if (ISSUPP_11ACENABLED(priv->adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n && !bss_desc->disable_11ac &&
-	    priv->adapter->config_bands & BAND_AAC)
+	    priv->config_bands & BAND_AAC)
 		nxpwifi_set_11ac_ba_params(priv);
 	else
 		nxpwifi_set_ba_params(priv);
@@ -897,19 +903,11 @@ EXPORT_SYMBOL_GPL(nxpwifi_deauthenticate_all);
 
 /* This function converts band to radio type used in channel TLV.
  */
-u8
-nxpwifi_band_to_radio_type(u8 band)
+u8 nxpwifi_band_to_radio_type(u16 config_bands)
 {
-	switch (band) {
-	case BAND_A:
-	case BAND_AN:
-	case BAND_A | BAND_AN:
-	case BAND_A | BAND_AN | BAND_AAC:
+	if (config_bands & BAND_A || config_bands & BAND_AN ||
+	    config_bands & BAND_AAC || config_bands & BAND_AAX)
 		return HOST_SCAN_RADIO_TYPE_A;
-	case BAND_B:
-	case BAND_G:
-	case BAND_B | BAND_G:
-	default:
-		return HOST_SCAN_RADIO_TYPE_BG;
-	}
+
+	return HOST_SCAN_RADIO_TYPE_BG;
 }

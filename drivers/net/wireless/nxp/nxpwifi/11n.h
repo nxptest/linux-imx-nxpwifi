@@ -112,7 +112,7 @@ nxpwifi_space_avail_for_new_ba_stream(struct nxpwifi_adapter *adapter)
 
 	if (adapter->fw_api_ver == NXPWIFI_FW_V15) {
 		ba_stream_max =
-			       GETSUPP_TXBASTREAMS(adapter->hw_dot_11n_dev_cap);
+			GETSUPP_TXBASTREAMS(adapter->hw_dot_11n_dev_cap);
 		if (!ba_stream_max)
 			ba_stream_max = NXPWIFI_MAX_TX_BASTREAM_SUPPORTED;
 	}

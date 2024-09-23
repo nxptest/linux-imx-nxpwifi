@@ -65,6 +65,12 @@ void nxpwifi_set_uap_rates(struct nxpwifi_uap_bss_param *bss_cfg,
 void nxpwifi_set_vht_width(struct nxpwifi_private *priv,
 			   enum nl80211_chan_width width,
 			   bool ap_11ac_disable);
+bool nxpwifi_check_11ax_capability(struct nxpwifi_private *priv,
+				   struct nxpwifi_uap_bss_param *bss_cfg,
+				   struct cfg80211_ap_settings *params);
+int nxpwifi_set_11ax_status(struct nxpwifi_private *priv,
+			    struct nxpwifi_uap_bss_param *bss_cfg,
+			    struct cfg80211_ap_settings *params);
 void nxpwifi_set_sys_config_invalid_data(struct nxpwifi_uap_bss_param *config);
 void nxpwifi_set_wmm_params(struct nxpwifi_private *priv,
 			    struct nxpwifi_uap_bss_param *bss_cfg,

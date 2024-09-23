@@ -5,8 +5,8 @@
  * Copyright 2011-2024 NXP
  */
 
-#ifndef _NXPWIFI_IOCTL_H_
-#define _NXPWIFI_IOCTL_H_
+#ifndef _NXPWIFI_CFG_H_
+#define _NXPWIFI_CFG_H_
 
 #include <net/lib80211.h>
 
@@ -43,7 +43,10 @@ enum {
 	BAND_A = 4,
 	BAND_GN = 8,
 	BAND_AN = 16,
-	BAND_AAC = 32,
+	BAND_GAC = 32,
+	BAND_AAC = 64,
+	BAND_GAX = 256,
+	BAND_AAX = 512,
 };
 
 #define NXPWIFI_WPA_PASSHPHRASE_LEN 64
@@ -442,4 +445,146 @@ struct nxpwifi_ds_coalesce_cfg {
 	struct nxpwifi_coalesce_rule rule[NXPWIFI_COALESCE_MAX_RULES];
 };
 
-#endif /* !_NXPWIFI_IOCTL_H_ */
+struct nxpwifi_11ax_he_cap_cfg {
+	u16 id;
+	u16 len;
+	u8 ext_id;
+	struct ieee80211_he_cap_elem cap_elem;
+	u8 he_txrx_mcs_support[4];
+	u8 val[28];
+};
+
+struct nxpwifi_11ax_he_cfg {
+	u8 band;
+	struct nxpwifi_11ax_he_cap_cfg he_cap_cfg;
+};
+
+#define NXPWIFI_11AXCMD_CFG_ID_SR_OBSS_PD_OFFSET 1
+#define NXPWIFI_11AXCMD_CFG_ID_SR_ENABLE         2
+#define NXPWIFI_11AXCMD_CFG_ID_BEAM_CHANGE       3
+#define NXPWIFI_11AXCMD_CFG_ID_HTC_ENABLE        4
+#define NXPWIFI_11AXCMD_CFG_ID_TXOP_RTS          5
+#define NXPWIFI_11AXCMD_CFG_ID_TX_OMI            6
+#define NXPWIFI_11AXCMD_CFG_ID_OBSSNBRU_TOLTIME  7
+#define NXPWIFI_11AXCMD_CFG_ID_SET_BSRP          8
+#define NXPWIFI_11AXCMD_CFG_ID_LLDE              9
+
+#define NXPWIFI_11AXCMD_SR_SUBID                 0x102
+#define NXPWIFI_11AXCMD_BEAM_SUBID               0x103
+#define NXPWIFI_11AXCMD_HTC_SUBID                0x104
+#define NXPWIFI_11AXCMD_TXOMI_SUBID              0x105
+#define NXPWIFI_11AXCMD_OBSS_TOLTIME_SUBID       0x106
+#define NXPWIFI_11AXCMD_TXOPRTS_SUBID            0x108
+#define NXPWIFI_11AXCMD_SET_BSRP_SUBID           0x109
+#define NXPWIFI_11AXCMD_LLDE_SUBID               0x110
+
+#define NXPWIFI_11AX_TWT_SETUP_SUBID             0x114
+#define NXPWIFI_11AX_TWT_TEARDOWN_SUBID          0x115
+#define NXPWIFI_11AX_TWT_REPORT_SUBID            0x116
+
+struct nxpwifi_11axcmdcfg_obss_pd_offset {
+	/* <NON_SRG_OffSET, SRG_OFFSET> */
+	u8 offset[2];
+};
+
+struct nxpwifi_11axcmdcfg_sr_control {
+	/* 1 enable, 0 disable */
+	u8 control;
+};
+
+struct nxpwifi_11ax_sr_cmd {
+	/* type */
+	u16 type;
+	/* length of TLV */
+	u16 len;
+	/* value */
+	union {
+		struct nxpwifi_11axcmdcfg_obss_pd_offset obss_pd_offset;
+		struct nxpwifi_11axcmdcfg_sr_control sr_control;
+	} param;
+};
+
+struct nxpwifi_11ax_beam_cmd {
+	/* command value: 1 is disable, 0 is enable */
+	u8 value;
+};
+
+struct nxpwifi_11ax_htc_cmd {
+	/* command value: 1 is enable, 0 is disable */
+	u8 value;
+};
+
+struct nxpwifi_11ax_txomi_cmd {
+	/* 11ax spec 9.2.4.6a.2 OM Control 12 bits. Bit 0 to bit 11 */
+	u16 omi;
+	/* tx option
+	 * 0: send OMI in QoS NULL; 1: send OMI in QoS data; 0xFF: set OMI in
+	 * both
+	 */
+	u8 tx_option;
+	/* if OMI is sent in QoS data, specify the number of consecutive data
+	 * packets containing the OMI
+	 */
+	u8 num_data_pkts;
+};
+
+struct nxpwifi_11ax_toltime_cmd {
+	/* OBSS Narrow Bandwidth RU Tolerance Time */
+	u32 tol_time;
+};
+
+struct nxpwifi_11ax_txop_cmd {
+	/* Two byte rts threshold value of which only 10 bits, bit 0 to bit 9
+	 * are valid
+	 */
+	u16 rts_thres;
+};
+
+struct nxpwifi_11ax_set_bsrp_cmd {
+	/* command value: 1 is enable, 0 is disable */
+	u8 value;
+};
+
+struct nxpwifi_11ax_llde_cmd {
+	/* Uplink LLDE: enable=1,disable=0 */
+	u8 llde;
+	/* operation mode: default=0,carplay=1,gameplay=2 */
+	u8 mode;
+	/* trigger frame rate: auto=0xff */
+	u8 fixrate;
+	/* cap airtime limit index: auto=0xff */
+	u8 trigger_limit;
+	/* cap peak UL rate */
+	u8 peak_ul_rate;
+	/* Downlink LLDE: enable=1,disable=0 */
+	u8 dl_llde;
+	/* Set trigger frame interval(us): auto=0 */
+	u16 poll_interval;
+	/* Set TxOp duration */
+	u16 tx_op_duration;
+	/* for other configurations */
+	u16 llde_ctrl;
+	u16 mu_rts_successcnt;
+	u16 mu_rts_failcnt;
+	u16 basic_trigger_successcnt;
+	u16 basic_trigger_failcnt;
+	u16 tbppdu_nullcnt;
+	u16 tbppdu_datacnt;
+};
+
+struct nxpwifi_11ax_cmd_cfg {
+	u32 sub_command;
+	u32 sub_id;
+	union {
+		struct nxpwifi_11ax_sr_cmd sr_cfg;
+		struct nxpwifi_11ax_beam_cmd beam_cfg;
+		struct nxpwifi_11ax_htc_cmd htc_cfg;
+		struct nxpwifi_11ax_txomi_cmd txomi_cfg;
+		struct nxpwifi_11ax_toltime_cmd toltime_cfg;
+		struct nxpwifi_11ax_txop_cmd txop_cfg;
+		struct nxpwifi_11ax_set_bsrp_cmd setbsrp_cfg;
+		struct nxpwifi_11ax_llde_cmd llde_cfg;
+	} param;
+};
+
+#endif /* !_NXPWIFI_CFG_H_ */

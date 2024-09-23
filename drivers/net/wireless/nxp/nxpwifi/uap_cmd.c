@@ -7,8 +7,9 @@
 
 #include "main.h"
 #include "cmdevt.h"
-#include "11ac.h"
 #include "11n.h"
+#include "11ac.h"
+#include "11ax.h"
 
 /* This function parses BSS related parameters from structure
  * and prepares TLVs specific to WPA/WPA2 security.
@@ -366,7 +367,7 @@ static int nxpwifi_uap_custom_ie_prepare(u8 *tlv, void *cmd_buf, u16 *ie_size)
 		return -EINVAL;
 
 	*ie_size += le16_to_cpu(ap_ie->len) +
-			sizeof(struct nxpwifi_ie_types_header);
+		    sizeof(struct nxpwifi_ie_types_header);
 
 	tlv_ie->type = cpu_to_le16(TLV_TYPE_MGMT_IE);
 	tlv_ie->len = ap_ie->len;
@@ -657,8 +658,21 @@ nxpwifi_cmd_uap_add_new_station(struct nxpwifi_private *priv,
 		cmd_size += tlv_len;
 	}
 
+	if (params->link_sta_params.he_capa_len) {
+		u8 *data = (u8 *)params->link_sta_params.he_capa;
+		u16 len = params->link_sta_params.he_capa_len;
+
+		tlv_len = nxpwifi_append_data_tlv(WLAN_EID_EXT_HE_CAPABILITY,
+						  data, len, pos, cmd_end);
+		if (!tlv_len)
+			return -EINVAL;
+		pos += tlv_len;
+		cmd_size += tlv_len;
+		sta_ptr->is_11ax_enabled = 1;
+	}
+
 	for (i = 0; i < MAX_NUM_TID; i++) {
-		if (sta_ptr->is_11n_enabled)
+		if (sta_ptr->is_11n_enabled || sta_ptr->is_11ax_enabled)
 			sta_ptr->ampdu_sta[i] =
 				      priv->aggr_prio_tbl[i].ampdu_user;
 		else
@@ -967,6 +981,71 @@ void nxpwifi_set_vht_width(struct nxpwifi_private *priv,
 			 HOST_ACT_GEN_SET, 0, &vht_cfg, true);
 }
 
+bool nxpwifi_check_11ax_capability(struct nxpwifi_private *priv,
+				   struct nxpwifi_uap_bss_param *bss_cfg,
+				   struct cfg80211_ap_settings *params)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+	u8 band = bss_cfg->band_cfg & BAND_CFG_CHAN_BAND_MASK;
+
+	if (band == BAND_2GHZ &&
+	    !(adapter->fw_bands & BAND_GAX))
+		return false;
+
+	if (band == BAND_5GHZ &&
+	    !(adapter->fw_bands & BAND_AAX))
+		return false;
+
+	if (params->he_cap)
+		return true;
+	else
+		return false;
+}
+
+int nxpwifi_set_11ax_status(struct nxpwifi_private *priv,
+			    struct nxpwifi_uap_bss_param *bss_cfg,
+			    struct cfg80211_ap_settings *params)
+{
+	struct nxpwifi_11ax_he_cfg ax_cfg;
+	u8 band = bss_cfg->band_cfg & BAND_CFG_CHAN_BAND_MASK;
+	struct element *he_cap;
+	int ret;
+
+	if (band == BAND_2GHZ)
+		ax_cfg.band = BIT(0);
+	else if (band == BAND_5GHZ)
+		ax_cfg.band = BIT(1);
+	else
+		return -EINVAL;
+
+	ret = nxpwifi_send_cmd(priv, HOST_CMD_11AX_CFG,
+			       HOST_ACT_GEN_GET, 0, &ax_cfg, true);
+	if (ret)
+		return ret;
+
+	he_cap = cfg80211_find_ext_elem(WLAN_EID_EXT_HE_CAPABILITY,
+					params->beacon.tail,
+					params->beacon.tail_len);
+
+	if (he_cap) {
+		ax_cfg.he_cap_cfg.id = he_cap->id;
+		ax_cfg.he_cap_cfg.len = he_cap->datalen;
+		memcpy(&ax_cfg.he_cap_cfg.ext_id,
+		       he_cap->data,
+		       he_cap->datalen);
+	} else {
+		/* disable */
+		if (ax_cfg.he_cap_cfg.len &&
+		    ax_cfg.he_cap_cfg.ext_id == WLAN_EID_EXT_HE_CAPABILITY) {
+			memset(ax_cfg.he_cap_cfg.he_txrx_mcs_support, 0xff,
+			       sizeof(ax_cfg.he_cap_cfg.he_txrx_mcs_support));
+		}
+	}
+
+	return nxpwifi_send_cmd(priv, HOST_CMD_11AX_CFG,
+				HOST_ACT_GEN_SET, 0, &ax_cfg, true);
+}
+
 /* This function finds supported rates IE from beacon parameter and sets
  * these rates into bss_config structure.
  */
@@ -1076,7 +1155,7 @@ void nxpwifi_uap_set_channel(struct nxpwifi_private *priv,
 			     struct nxpwifi_uap_bss_param *bss_cfg,
 			     struct cfg80211_chan_def chandef)
 {
-	u8 config_bands = 0, old_bands = priv->adapter->config_bands;
+	u8 config_bands = 0, old_bands = priv->config_bands;
 
 	priv->bss_chandef = chandef;
 
@@ -1126,10 +1205,16 @@ void nxpwifi_uap_set_channel(struct nxpwifi_private *priv,
 		break;
 	}
 
-	priv->adapter->config_bands = config_bands;
+	priv->config_bands = config_bands;
 
 	if (old_bands != config_bands) {
-		nxpwifi_send_domain_info_cmd_fw(priv->adapter->wiphy);
+		if (nxpwifi_band_to_radio_type(priv->config_bands) ==
+		    HOST_SCAN_RADIO_TYPE_BG)
+			nxpwifi_send_domain_info_cmd_fw(priv->adapter->wiphy,
+							NL80211_BAND_2GHZ);
+		else
+			nxpwifi_send_domain_info_cmd_fw(priv->adapter->wiphy,
+							NL80211_BAND_5GHZ);
 		nxpwifi_dnld_txpwr_table(priv);
 	}
 }

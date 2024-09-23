@@ -134,7 +134,7 @@ nxpwifi_uap_event_sta_assoc(struct nxpwifi_private *priv)
 			       sinfo->assoc_req_ies_len, node);
 
 	for (i = 0; i < MAX_NUM_TID; i++) {
-		if (node->is_11n_enabled)
+		if (node->is_11n_enabled || node->is_11ax_enabled)
 			node->ampdu_sta[i] =
 				      priv->aggr_prio_tbl[i].ampdu_user;
 		else

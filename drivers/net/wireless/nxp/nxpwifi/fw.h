@@ -63,27 +63,28 @@ struct nxpwifi_fw_dump_header {
 #define A_SUPPORTED_RATES               9
 #define HOSTCMD_SUPPORTED_RATES         14
 #define N_SUPPORTED_RATES               3
-#define ALL_802_11_BANDS           (BAND_A | BAND_B | BAND_G | BAND_GN | \
-				    BAND_AN | BAND_AAC)
-
-#define FW_MULTI_BANDS_SUPPORT  (BIT(8) | BIT(9) | BIT(10) | BIT(11) | \
-				 BIT(13))
-#define IS_SUPPORT_MULTI_BANDS(adapter)        \
+#define ALL_802_11_BANDS \
+	(BAND_A | BAND_B | BAND_G | BAND_GN | BAND_AN | BAND_AAC | BAND_GAC)
+#define FW_MULTI_BANDS_SUPPORT \
+	(BIT(8) | BIT(9) | BIT(10) | BIT(11) | BIT(12) | BIT(13))
+#define IS_SUPPORT_MULTI_BANDS(adapter) \
 	((adapter)->fw_cap_info & FW_MULTI_BANDS_SUPPORT)
 
-/* bit 13: 11ac BAND_AAC
- * bit 12: reserved for lab testing, will be reused for BAND_AN
- * bit 11: 11n  BAND_GN
- * bit 10: 11a  BAND_A
- * bit 9: 11g   BAND_G
- * bit 8: 11b   BAND_B
- * Map these bits to band capability by right shifting 8 bits.
+/* Get default bands of the firmware:
+ * need to shift bit 12 and bit 13 in fw_cap_info from the firmware
+ * to bit 13 and 14 for 11ac so that bit 11 is for GN, bit 12 for AN,
+ * bit 13 for GAC, and bit 14 for AAC, in order to be compatible with
+ * the band capability defined in the driver after right shift of 8 bits
  */
-#define GET_FW_DEFAULT_BANDS(adapter)  \
-	    ((((adapter)->fw_cap_info & 0x2f00) >> 8) & \
-	     ALL_802_11_BANDS)
+#define GET_FW_DEFAULT_BANDS(adapter) ({\
+	typeof(adapter) (_adapter) = adapter; \
+	(((((_adapter->fw_cap_info & 0x3000) << 1) | \
+	   (_adapter->fw_cap_info & ~0xF000)) \
+	  >> 8) & \
+	 ALL_802_11_BANDS); \
+	})
 
-#define HOST_WEP_KEY_INDEX_MASK              0x3fff
+#define HOST_WEP_KEY_INDEX_MASK 0x3fff
 
 #define KEY_INFO_ENABLED        0x01
 enum KEY_TYPE_ID {
@@ -128,26 +129,28 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 	NXPWIFI_802_11_PRIV_FILTER_8021X_WEP
 };
 
-#define CAL_SNR(RSSI, NF)		((s16)((s16)(RSSI) - (s16)(NF)))
-#define CAL_RSSI(SNR, NF)		((s16)((s16)(SNR) + (s16)(NF)))
+#define CAL_SNR(RSSI, NF)           ((s16)((s16)(RSSI) - (s16)(NF)))
+#define CAL_RSSI(SNR, NF)           ((s16)((s16)(SNR) + (s16)(NF)))
 
-#define UAP_BSS_PARAMS_I			0
-#define UAP_CUSTOM_IE_I				1
-#define NXPWIFI_AUTO_IDX_MASK			0xffff
-#define NXPWIFI_DELETE_MASK			0x0000
-#define MGMT_MASK_ASSOC_REQ			0x01
-#define MGMT_MASK_REASSOC_REQ			0x04
-#define MGMT_MASK_ASSOC_RESP			0x02
-#define MGMT_MASK_REASSOC_RESP			0x08
-#define MGMT_MASK_PROBE_REQ			0x10
-#define MGMT_MASK_PROBE_RESP			0x20
-#define MGMT_MASK_BEACON			0x100
+#define UAP_BSS_PARAMS_I            0
+#define UAP_CUSTOM_IE_I             1
+#define NXPWIFI_AUTO_IDX_MASK       0xffff
+#define NXPWIFI_DELETE_MASK         0x0000
+#define MGMT_MASK_ASSOC_REQ         0x01
+#define MGMT_MASK_REASSOC_REQ       0x04
+#define MGMT_MASK_ASSOC_RESP        0x02
+#define MGMT_MASK_REASSOC_RESP      0x08
+#define MGMT_MASK_PROBE_REQ         0x10
+#define MGMT_MASK_PROBE_RESP        0x20
+#define MGMT_MASK_BEACON            0x100
 
-#define TLV_TYPE_UAP_SSID			0x0000
-#define TLV_TYPE_UAP_RATES			0x0001
-#define TLV_TYPE_PWR_CONSTRAINT			0x0020
+#define TLV_TYPE_UAP_SSID           0x0000
+#define TLV_TYPE_UAP_RATES          0x0001
+#define TLV_TYPE_PWR_CONSTRAINT     0x0020
+#define TLV_TYPE_HT_CAPABILITY      0x002d
+#define TLV_TYPE_EXTENSION_ID       0x00ff
 
-#define PROPRIETARY_TLV_BASE_ID                 0x0100
+#define PROPRIETARY_TLV_BASE_ID     0x0100
 #define TLV_TYPE_KEY_MATERIAL       (PROPRIETARY_TLV_BASE_ID + 0)
 #define TLV_TYPE_CHANLIST           (PROPRIETARY_TLV_BASE_ID + 1)
 #define TLV_TYPE_NUMPROBES          (PROPRIETARY_TLV_BASE_ID + 2)
@@ -209,32 +212,37 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_MAX_CONN           (PROPRIETARY_TLV_BASE_ID + 279)
 #define TLV_TYPE_HOST_MLME          (PROPRIETARY_TLV_BASE_ID + 307)
 #define TLV_TYPE_UAP_STA_FLAGS      (PROPRIETARY_TLV_BASE_ID + 313)
+#define TLV_TYPE_FW_CAP_INFO        (PROPRIETARY_TLV_BASE_ID + 318)
+#define TLV_TYPE_AX_ENABLE_SR       (PROPRIETARY_TLV_BASE_ID + 322)
+#define TLV_TYPE_AX_OBSS_PD_OFFSET  (PROPRIETARY_TLV_BASE_ID + 323)
 #define TLV_TYPE_SAE_PWE_MODE       (PROPRIETARY_TLV_BASE_ID + 339)
+#define TLV_TYPE_6E_INBAND_FRAMES   (PROPRIETARY_TLV_BASE_ID + 345)
+#define TLV_TYPE_SECURE_BOOT_UUID   (PROPRIETARY_TLV_BASE_ID + 348)
 
-#define NXPWIFI_TX_DATA_BUF_SIZE_2K        2048
+#define NXPWIFI_TX_DATA_BUF_SIZE_2K 2048
 
-#define SSN_MASK         0xfff0
+#define SSN_MASK                    0xfff0
 
-#define BA_RESULT_SUCCESS        0x0
-#define BA_RESULT_TIMEOUT        0x2
+#define BA_RESULT_SUCCESS           0x0
+#define BA_RESULT_TIMEOUT           0x2
 
-#define IS_BASTREAM_SETUP(ptr)  ((ptr)->ba_status)
+#define IS_BASTREAM_SETUP(ptr)      ((ptr)->ba_status)
 
-#define BA_STREAM_NOT_ALLOWED   0xff
+#define BA_STREAM_NOT_ALLOWED       0xff
 
 #define IS_11N_ENABLED(priv) ({ \
 	typeof(priv) (_priv) = priv; \
-	(((_priv)->adapter->config_bands & BAND_GN || \
-	 (_priv)->adapter->config_bands & BAND_AN) && \
+	(((_priv)->config_bands & BAND_GN || \
+	 (_priv)->config_bands & BAND_AN) && \
 	 (_priv)->curr_bss_params.bss_descriptor.bcn_ht_cap && \
 	 !(_priv)->curr_bss_params.bss_descriptor.disable_11n); \
 	})
 #define INITIATOR_BIT(del_ba_param_set) (((del_ba_param_set) &\
 	BIT(DELBA_INITIATOR_POS)) >> DELBA_INITIATOR_POS)
 
-#define NXPWIFI_TX_DATA_BUF_SIZE_4K        4096
-#define NXPWIFI_TX_DATA_BUF_SIZE_8K        8192
-#define NXPWIFI_TX_DATA_BUF_SIZE_12K       12288
+#define NXPWIFI_TX_DATA_BUF_SIZE_4K  4096
+#define NXPWIFI_TX_DATA_BUF_SIZE_8K  8192
+#define NXPWIFI_TX_DATA_BUF_SIZE_12K 12288
 
 #define ISSUPP_11NENABLED(fw_cap_info) ((fw_cap_info) & BIT(11))
 #define ISSUPP_DRCS_ENABLED(fw_cap_info) ((fw_cap_info) & BIT(15))
@@ -298,6 +306,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
  */
 #define NXPWIFI_11AC_MCS_MAP_2X2	0xfffafffa
 
+#define GET_TXMCSSUPP(dev_mcs_supported) ((dev_mcs_supported) >> 4)
 #define GET_RXMCSSUPP(dev_mcs_supported) ((dev_mcs_supported) & 0x0f)
 #define SETHT_MCS32(x) (x[4] |= 1)
 #define HT_STREAM_1X1	0x11
@@ -311,23 +320,23 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 /* HW_SPEC fw_cap_info */
 
 #define ISSUPP_11ACENABLED(fw_cap_info) ((fw_cap_info) & BIT(13))
-
-#define GET_VHTCAP_CHWDSET(vht_cap_info)    (((vht_cap_info) >> 2) & 0x3)
+#define GET_VHTCAP_CHWDSET(vht_cap_info) (((vht_cap_info) >> 2) & 0x3)
+#define NO_NSS_SUPPORT 0x3
 #define GET_VHTNSSMCS(mcs_mapset, nss) \
 	(((mcs_mapset) >> (2 * ((nss) - 1))) & 0x3)
 #define SET_VHTNSSMCS(mcs_mapset, nss, value) \
 	((mcs_mapset) |= ((value) & 0x3) << (2 * ((nss) - 1)))
-#define GET_DEVTXMCSMAP(dev_mcs_map)      ((dev_mcs_map) >> 16)
-#define GET_DEVRXMCSMAP(dev_mcs_map)      ((dev_mcs_map) & 0xFFFF)
+#define GET_DEVTXMCSMAP(dev_mcs_map) ((dev_mcs_map) >> 16)
+#define GET_DEVRXMCSMAP(dev_mcs_map) ((dev_mcs_map) & 0xFFFF)
 
 /* Clear SU Beanformer, MU beanformer, MU beanformee and
  * sounding dimensions bits
  */
 #define NXPWIFI_DEF_11AC_CAP_BF_RESET_MASK \
-			(IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE | \
-			 IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE | \
-			 IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE | \
-			 IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK)
+	(IEEE80211_VHT_CAP_SU_BEAMFORMER_CAPABLE | \
+	 IEEE80211_VHT_CAP_MU_BEAMFORMER_CAPABLE | \
+	 IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE | \
+	 IEEE80211_VHT_CAP_SOUNDING_DIMENSIONS_MASK)
 
 #define MOD_CLASS_HR_DSSS       0x03
 #define MOD_CLASS_OFDM          0x07
@@ -336,6 +345,8 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HT_BW_40    1
 
 #define DFS_CHAN_MOVE_TIME      10000
+
+#define ISSUPP_11AXENABLED(fw_cap_ext) ((fw_cap_ext) & BIT(7))
 
 #define HOST_CMD_GET_HW_SPEC                       0x0003
 #define HOST_CMD_802_11_SCAN                       0x0006
@@ -403,6 +414,8 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_CHAN_REGION_CFG                   0x0242
 #define HOST_CMD_PACKET_AGGR_CTRL                  0x0251
 #define HOST_CMD_ADD_NEW_STATION                   0x025f
+#define HOST_CMD_11AX_CFG                          0x0266
+#define HOST_CMD_11AX_CMD                          0x026d
 
 #define PROTOCOL_NO_SECURITY        0x01
 #define PROTOCOL_STATIC_WEP         0x02
@@ -1029,6 +1042,59 @@ struct hw_spec_api_rev {
 	u8 minor_ver;
 } __packed;
 
+struct hw_spec_max_conn {
+	struct nxpwifi_ie_types_header header;
+	u8 reserved;
+	u8 max_sta_conn;
+} __packed;
+
+struct hw_spec_extension {
+	struct nxpwifi_ie_types_header header;
+	u8 ext_id;
+	u8 tlv[];
+} __packed;
+
+/* HE MAC Capabilities Information field BIT 1 for TWT Req */
+#define HE_MAC_CAP_TWT_REQ_SUPPORT BIT(1)
+/* HE MAC Capabilities Information field BIT 2 for TWT Resp*/
+#define HE_MAC_CAP_TWT_RESP_SUPPORT BIT(2)
+
+struct nxpwifi_ie_types_he_cap {
+	struct nxpwifi_ie_types_header header;
+	u8 ext_id;
+	u8 he_mac_cap[6];
+	u8 he_phy_cap[11];
+	__le16 rx_mcs_80;
+	__le16 tx_mcs_80;
+	__le16 rx_mcs_160;
+	__le16 tx_mcs_160;
+	__le16 rx_mcs_80p80;
+	__le16 tx_mcs_80p80;
+	u8 val[20];
+} __packed;
+
+struct nxpwifi_ie_types_he_op {
+	struct nxpwifi_ie_types_header header;
+	u8 ext_id;
+	__le16 he_op_param1;
+	u8 he_op_param2;
+	u8 bss_color_info;
+	__le16 basic_he_mcs_nss;
+	u8 option[9];
+} __packed;
+
+struct hw_spec_secure_boot_uuid {
+	struct nxpwifi_ie_types_header header;
+	__le64 uuid_lo;
+	__le64 uuid_hi;
+} __packed;
+
+struct hw_spec_fw_cap_info {
+	struct nxpwifi_ie_types_header header;
+	__le32 fw_cap_info;
+	__le32 fw_cap_ext;
+} __packed;
+
 struct host_cmd_ds_get_hw_spec {
 	__le16 hw_if_version;
 	__le16 version;
@@ -1038,19 +1104,19 @@ struct host_cmd_ds_get_hw_spec {
 	__le16 region_code;
 	__le16 number_of_antenna;
 	__le32 fw_release_number;
+	__le32 hw_dev_cap;
 	__le32 reserved_1;
 	__le32 reserved_2;
-	__le32 reserved_3;
 	__le32 fw_cap_info;
 	__le32 dot_11n_dev_cap;
 	u8 dev_mcs_support;
 	__le16 mp_end_port;	/* SDIO only, reserved for other interfacces */
 	__le16 mgmt_buf_count;	/* mgmt IE buffer count */
+	__le32 reserved_3;
 	__le32 reserved_4;
-	__le32 reserved_5;
 	__le32 dot_11ac_dev_cap;
 	__le32 dot_11ac_mcs_support;
-	u8 tlvs[];
+	u8 tlv[];
 } __packed;
 
 struct host_cmd_ds_802_11_rssi_info {
@@ -1472,13 +1538,13 @@ struct nxpwifi_ie_types_bss_mode {
 	u8 bss_mode;
 } __packed;
 
-struct nxpwifi_ie_types_bss_scan_rsp {
+struct nxpwifi_ie_types_scan_rsp {
 	struct nxpwifi_ie_types_header header;
 	u8 bssid[ETH_ALEN];
 	u8 frame_body[];
 } __packed;
 
-struct nxpwifi_ie_types_bss_scan_info {
+struct nxpwifi_ie_types_scan_inf {
 	struct nxpwifi_ie_types_header header;
 	__le16 rssi;
 	__le16 anpi;
@@ -2144,6 +2210,18 @@ struct host_cmd_ds_add_station {
 	u8 tlv[];
 } __packed;
 
+struct host_cmd_11ax_cfg {
+	__le16 action;
+	u8 band_config;
+	u8 tlv[];
+} __packed;
+
+struct host_cmd_11ax_cmd {
+	__le16 action;
+	__le16 sub_id;
+	u8 val[];
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2214,6 +2292,8 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_pkt_aggr_ctrl pkt_aggr_ctrl;
 		struct host_cmd_ds_sta_configure sta_cfg;
 		struct host_cmd_ds_add_station sta_info;
+		struct host_cmd_11ax_cfg ax_cfg;
+		struct host_cmd_11ax_cmd ax_cmd;
 	} params;
 } __packed;
 
@@ -2224,12 +2304,6 @@ struct nxpwifi_opt_sleep_confirm {
 	__le16 result;
 	__le16 action;
 	__le16 resp_ctrl;
-} __packed;
-
-struct hw_spec_max_conn {
-	struct nxpwifi_ie_types_header header;
-	u8 reserved;
-	u8 max_sta_conn;
 } __packed;
 
 #define VDLL_IND_TYPE_REQ		0

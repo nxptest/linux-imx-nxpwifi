@@ -397,14 +397,14 @@ nxpwifi_wmm_init(struct nxpwifi_adapter *adapter)
 			if (!disable_tx_amsdu &&
 			    adapter->tx_buf_size > NXPWIFI_TX_DATA_BUF_SIZE_2K)
 				priv->aggr_prio_tbl[i].amsdu =
-							priv->tos_to_tid_inv[i];
+					priv->tos_to_tid_inv[i];
 			else
 				priv->aggr_prio_tbl[i].amsdu =
-							BA_STREAM_NOT_ALLOWED;
+					BA_STREAM_NOT_ALLOWED;
 			priv->aggr_prio_tbl[i].ampdu_ap =
-							priv->tos_to_tid_inv[i];
+				priv->tos_to_tid_inv[i];
 			priv->aggr_prio_tbl[i].ampdu_user =
-							priv->tos_to_tid_inv[i];
+				priv->tos_to_tid_inv[i];
 		}
 
 		priv->aggr_prio_tbl[6].amsdu =
@@ -890,8 +890,8 @@ nxpwifi_wmm_process_association_req(struct nxpwifi_private *priv,
 		    wmm_ie->element_id);
 
 	if ((priv->wmm_required ||
-	     (ht_cap && (priv->adapter->config_bands & BAND_GN ||
-	     priv->adapter->config_bands & BAND_AN))) &&
+	     (ht_cap && (priv->config_bands & BAND_GN ||
+	     priv->config_bands & BAND_AN))) &&
 	    wmm_ie->element_id == WLAN_EID_VENDOR_SPECIFIC) {
 		wmm_tlv = (struct nxpwifi_ie_types_wmm_param_set *)*assoc_buf;
 		wmm_tlv->header.type = cpu_to_le16((u16)wmm_info_ie[0]);

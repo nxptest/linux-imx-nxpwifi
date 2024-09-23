@@ -311,7 +311,7 @@ bool nxpwifi_is_channel_setting_allowable(struct nxpwifi_private *priv,
 	u8 bss_role = GET_BSS_ROLE(priv);
 	struct ieee80211_channel *set_chan;
 
-	for (i = 0; i < NXPWIFI_MAX_BSS_NUM; i++) {
+	for (i = 0; i < adapter->priv_num; i++) {
 		tmp_priv = adapter->priv[i];
 		if (tmp_priv == priv)
 			continue;
@@ -789,13 +789,23 @@ int nxpwifi_append_data_tlv(u16 id, u8 *data, int len, u8 *pos, u8 *cmd_end)
 	struct nxpwifi_ie_types_data *tlv;
 	u16 header_len = sizeof(struct nxpwifi_ie_types_header);
 
-	if (pos + len > cmd_end)
-		return 0;
-
 	tlv = (struct nxpwifi_ie_types_data *)pos;
-	tlv->header.type = cpu_to_le16(id);
 	tlv->header.len = cpu_to_le16(len);
-	memcpy(tlv->data, data, len);
+
+	if (id == WLAN_EID_EXT_HE_CAPABILITY) {
+		if ((pos + header_len + len + 1) > cmd_end)
+			return 0;
+
+		tlv->header.type = cpu_to_le16(WLAN_EID_EXTENSION);
+		tlv->data[0] = WLAN_EID_EXT_HE_CAPABILITY;
+		memcpy(tlv->data + 1, data, len);
+	} else {
+		if ((pos + header_len + len) > cmd_end)
+			return 0;
+
+		tlv->header.type = cpu_to_le16(id);
+		memcpy(tlv->data, data, len);
+	}
 
 	return (header_len + len);
 }

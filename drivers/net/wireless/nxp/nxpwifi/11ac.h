@@ -28,6 +28,5 @@ int nxpwifi_cmd_append_11ac_tlv(struct nxpwifi_private *priv,
 int nxpwifi_cmd_11ac_cfg(struct nxpwifi_private *priv,
 			 struct host_cmd_ds_command *cmd, u16 cmd_action,
 			 struct nxpwifi_11ac_vht_cfg *cfg);
-void nxpwifi_fill_vht_cap_tlv(struct nxpwifi_private *priv,
-			      struct ieee80211_vht_cap *vht_cap, u8 bands);
+
 #endif /* _NXPWIFI_11AC_H_ */

@@ -323,8 +323,8 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 			return 0;
 		} else if (nxpwifi_is_bss_wpa(priv, bss_desc)) {
 			/* WPA enabled */
-			if (((priv->adapter->config_bands & BAND_GN ||
-			      priv->adapter->config_bands & BAND_AN) &&
+			if (((priv->config_bands & BAND_GN ||
+			      priv->config_bands & BAND_AN) &&
 			     bss_desc->bcn_ht_cap) &&
 			    !nxpwifi_is_wpa_oui_present(bss_desc,
 							 CIPHER_SUITE_CCMP)) {
@@ -341,8 +341,8 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 			return 0;
 		} else if (nxpwifi_is_bss_wpa2(priv, bss_desc)) {
 			/* WPA2 enabled */
-			if (((priv->adapter->config_bands & BAND_GN ||
-			      priv->adapter->config_bands & BAND_AN) &&
+			if (((priv->config_bands & BAND_GN ||
+			      priv->config_bands & BAND_AN) &&
 			     bss_desc->bcn_ht_cap) &&
 			    !nxpwifi_is_rsn_oui_present(bss_desc,
 							CIPHER_SUITE_CCMP)) {
@@ -960,15 +960,15 @@ nxpwifi_config_scan(struct nxpwifi_private *priv,
 	}
 
 	if (ISSUPP_11NENABLED(priv->adapter->fw_cap_info) &&
-	    (priv->adapter->config_bands & BAND_GN ||
-	     priv->adapter->config_bands & BAND_AN)) {
+	    (priv->config_bands & BAND_GN ||
+	     priv->config_bands & BAND_AN)) {
 		ht_cap = (struct nxpwifi_ie_types_htcap *)tlv_pos;
 		memset(ht_cap, 0, sizeof(struct nxpwifi_ie_types_htcap));
 		ht_cap->header.type = cpu_to_le16(WLAN_EID_HT_CAPABILITY);
 		ht_cap->header.len =
-				cpu_to_le16(sizeof(struct ieee80211_ht_cap));
+			cpu_to_le16(sizeof(struct ieee80211_ht_cap));
 		radio_type =
-			nxpwifi_band_to_radio_type(priv->adapter->config_bands);
+			nxpwifi_band_to_radio_type(priv->config_bands);
 		nxpwifi_fill_cap_info(priv, radio_type, &ht_cap->ht_cap);
 		tlv_pos += sizeof(struct nxpwifi_ie_types_htcap);
 	}
@@ -1127,6 +1127,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 				    struct nxpwifi_bssdescriptor *bss_entry)
 {
 	u8 element_id;
+	u16 elem_size = sizeof(struct element);
 	struct ieee_types_fh_param_set *fh_param_set;
 	struct ieee_types_ds_param_set *ds_param_set;
 	struct ieee_types_cf_param_set *cf_param_set;
@@ -1151,7 +1152,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 	while (bytes_left >= 2) {
 		element_id = *current_ptr;
 		element_len = *(current_ptr + 1);
-		total_ie_len = element_len + sizeof(struct element);
+		total_ie_len = element_len + elem_size;
 
 		if (bytes_left < total_ie_len) {
 			nxpwifi_dbg(adapter, ERROR,
@@ -1264,7 +1265,7 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 
 		case WLAN_EID_VENDOR_SPECIFIC:
 			vendor_ie = (struct ieee_types_vendor_specific *)
-					current_ptr;
+				current_ptr;
 
 			/* 802.11 requires at least 3-byte OUI. */
 			if (element_len < sizeof(vendor_ie->vend_hdr.oui))
@@ -1279,10 +1280,11 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 				bss_entry->bcn_wpa_ie =
 					(struct ieee_types_vendor_specific *)
 					current_ptr;
-				bss_entry->wpa_offset = (u16)
-					(current_ptr - bss_entry->beacon_buf);
+				bss_entry->wpa_offset =
+					(u16)(current_ptr -
+					      bss_entry->beacon_buf);
 			} else if (!memcmp(&vendor_ie->vend_hdr.oui, wmm_oui,
-				    sizeof(wmm_oui))) {
+					   sizeof(wmm_oui))) {
 				if (total_ie_len ==
 				    sizeof(struct ieee80211_wmm_param_ie) ||
 				    total_ie_len ==
@@ -1308,37 +1310,35 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 				(u16)(current_ptr - bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_HT_CAPABILITY:
-			bss_entry->bcn_ht_cap = (struct ieee80211_ht_cap *)
-					(current_ptr +
-					sizeof(struct element));
-			bss_entry->ht_cap_offset = (u16)(current_ptr +
-					sizeof(struct element) -
-					bss_entry->beacon_buf);
+			bss_entry->bcn_ht_cap =
+				(struct ieee80211_ht_cap *)(current_ptr +
+							    elem_size);
+			bss_entry->ht_cap_offset =
+				(u16)(current_ptr + elem_size -
+				      bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_HT_OPERATION:
 			bss_entry->bcn_ht_oper =
 				(struct ieee80211_ht_operation *)(current_ptr +
-					sizeof(struct element));
-			bss_entry->ht_info_offset = (u16)(current_ptr +
-					sizeof(struct element) -
-					bss_entry->beacon_buf);
+								  elem_size);
+			bss_entry->ht_info_offset =
+				(u16)(current_ptr + elem_size -
+				      bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_VHT_CAPABILITY:
 			bss_entry->disable_11ac = false;
-			bss_entry->bcn_vht_cap =
-				(void *)(current_ptr +
-					 sizeof(struct element));
+			bss_entry->bcn_vht_cap = (void *)(current_ptr +
+							  elem_size);
 			bss_entry->vht_cap_offset =
-					(u16)((u8 *)bss_entry->bcn_vht_cap -
-					      bss_entry->beacon_buf);
+				(u16)((u8 *)bss_entry->bcn_vht_cap -
+				      bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_VHT_OPERATION:
 			bss_entry->bcn_vht_oper =
-				(void *)(current_ptr +
-					 sizeof(struct element));
+				(void *)(current_ptr + elem_size);
 			bss_entry->vht_info_offset =
-					(u16)((u8 *)bss_entry->bcn_vht_oper -
-					      bss_entry->beacon_buf);
+				(u16)((u8 *)bss_entry->bcn_vht_oper -
+				      bss_entry->beacon_buf);
 			break;
 		case WLAN_EID_BSS_COEX_2040:
 			bss_entry->bcn_bss_co_2040 = current_ptr;
@@ -1353,8 +1353,29 @@ int nxpwifi_update_bss_desc_with_ie(struct nxpwifi_adapter *adapter,
 		case WLAN_EID_OPMODE_NOTIF:
 			bss_entry->oper_mode = (void *)current_ptr;
 			bss_entry->oper_mode_offset =
-					(u16)((u8 *)bss_entry->oper_mode -
+				(u16)(current_ptr - bss_entry->beacon_buf);
+			break;
+		case WLAN_EID_EXTENSION:
+			struct element *elem = (struct element *)current_ptr;
+
+			switch (elem->data[0]) {
+			case WLAN_EID_EXT_HE_CAPABILITY:
+				bss_entry->disable_11ax = false;
+				bss_entry->bcn_he_cap =
+					(void *)(current_ptr + elem_size + 1);
+				bss_entry->he_cap_offset =
+					(u16)((u8 *)bss_entry->bcn_he_cap -
 					      bss_entry->beacon_buf);
+				break;
+			case WLAN_EID_EXT_HE_OPERATION:
+				bss_entry->bcn_he_oper =
+					(void *)(current_ptr + elem_size + 1);
+				bss_entry->he_info_offset =
+					(u16)((u8 *)bss_entry->bcn_he_oper -
+					      bss_entry->beacon_buf);
+			default:
+				break;
+			}
 			break;
 		default:
 			break;
@@ -2513,8 +2534,8 @@ int nxpwifi_handle_event_ext_scan_report(struct nxpwifi_private *priv,
 	u32 bytes_left, bytes_left_for_tlv, idx;
 	u16 type, len;
 	struct nxpwifi_ie_types_data *tlv;
-	struct nxpwifi_ie_types_bss_scan_rsp *scan_rsp_tlv;
-	struct nxpwifi_ie_types_bss_scan_info *scan_info_tlv;
+	struct nxpwifi_ie_types_scan_rsp *scan_rsp_tlv;
+	struct nxpwifi_ie_types_scan_inf *scan_info_tlv;
 	u8 *radio_type;
 	u64 fw_tsf = 0;
 	s32 rssi = 0;
@@ -2560,10 +2581,10 @@ int nxpwifi_handle_event_ext_scan_report(struct nxpwifi_private *priv,
 			break;
 
 		bss_info = (u8 *)tlv;
-		scan_rsp_tlv = (struct nxpwifi_ie_types_bss_scan_rsp *)tlv;
+		scan_rsp_tlv = (struct nxpwifi_ie_types_scan_rsp *)tlv;
 		tlv = (struct nxpwifi_ie_types_data *)(tlv->data + len);
 		bytes_left_for_tlv -=
-				(len + sizeof(struct nxpwifi_ie_types_header));
+			(len + sizeof(struct nxpwifi_ie_types_header));
 
 		while (bytes_left_for_tlv >=
 		       sizeof(struct nxpwifi_ie_types_header) &&
@@ -2582,9 +2603,9 @@ int nxpwifi_handle_event_ext_scan_report(struct nxpwifi_private *priv,
 			switch (type) {
 			case TLV_TYPE_BSS_SCAN_INFO:
 				scan_info_tlv =
-				  (struct nxpwifi_ie_types_bss_scan_info *)tlv;
+					(struct nxpwifi_ie_types_scan_inf *)tlv;
 				if (len !=
-				 sizeof(struct nxpwifi_ie_types_bss_scan_info) -
+				 sizeof(struct nxpwifi_ie_types_scan_inf) -
 				 sizeof(struct nxpwifi_ie_types_header)) {
 					bytes_left_for_tlv = 0;
 					continue;
@@ -2782,6 +2803,14 @@ nxpwifi_save_curr_bcn(struct nxpwifi_private *priv)
 	if (curr_bss->bcn_vht_oper)
 		curr_bss->bcn_vht_oper = (void *)(curr_bss->beacon_buf +
 						  curr_bss->vht_info_offset);
+
+	if (curr_bss->bcn_he_cap)
+		curr_bss->bcn_he_cap = (void *)(curr_bss->beacon_buf +
+						curr_bss->he_cap_offset);
+
+	if (curr_bss->bcn_he_oper)
+		curr_bss->bcn_he_oper = (void *)(curr_bss->beacon_buf +
+						 curr_bss->he_info_offset);
 
 	if (curr_bss->bcn_bss_co_2040)
 		curr_bss->bcn_bss_co_2040 =

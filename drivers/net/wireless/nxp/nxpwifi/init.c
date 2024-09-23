@@ -270,7 +270,6 @@ static void nxpwifi_init_adapter(struct nxpwifi_adapter *adapter)
 	adapter->tx_lock_flag = false;
 	adapter->null_pkt_interval = 0;
 	adapter->fw_bands = 0;
-	adapter->config_bands = 0;
 	adapter->fw_release_number = 0;
 	adapter->fw_cap_info = 0;
 	memset(&adapter->upld_buf, 0, sizeof(adapter->upld_buf));

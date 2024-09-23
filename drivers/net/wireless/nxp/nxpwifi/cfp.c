@@ -46,8 +46,6 @@ static u8 supported_rates_bg[BG_SUPPORTED_RATES] = { 0x02, 0x04, 0x0b, 0x0c,
 u16 region_code_index[NXPWIFI_MAX_REGION_CODE] = { 0x00, 0x10, 0x20, 0x30,
 						0x31, 0x32, 0x40, 0x41, 0x50 };
 
-static u8 supported_rates_n[N_SUPPORTED_RATES] = { 0x02, 0x04, 0 };
-
 /* For every mcs_rate line, the first 8 bytes are for stream 1x1,
  * and all 16 bytes are for stream 2x2.
  */
@@ -392,70 +390,64 @@ u32 nxpwifi_get_rates_from_cfg80211(struct nxpwifi_private *priv,
 	return num_rates;
 }
 
+/* Convert config_bands to B/G/A band
+ */
+static u16 nxpwifi_convert_config_bands(u16 config_bands)
+{
+	u16 bands = 0;
+
+	if (config_bands & BAND_B)
+		bands |= BAND_B;
+	if (config_bands & BAND_G || config_bands & BAND_GN ||
+	    config_bands & BAND_GAC || config_bands & BAND_GAX)
+		bands |= BAND_G;
+	if (config_bands & BAND_A || config_bands & BAND_AN ||
+	    config_bands & BAND_AAC || config_bands & BAND_AAX)
+		bands |= BAND_A;
+
+	return bands;
+}
+
 /* This function gets the supported data rates. The function works in
- * both Ad-Hoc and infra mode by printing the band and returning the
- * data rates.
+ * infra mode by printing the band and returning the data rates.
  */
 u32 nxpwifi_get_supported_rates(struct nxpwifi_private *priv, u8 *rates)
 {
-	u32 k = 0;
 	struct nxpwifi_adapter *adapter = priv->adapter;
+	u32 k = 0;
+	u16 bands = 0;
+
+	bands = nxpwifi_convert_config_bands(adapter->fw_bands);
 
 	if (priv->bss_mode == NL80211_IFTYPE_STATION) {
-		switch (adapter->config_bands) {
-		case BAND_B:
+		if (bands == BAND_B) {
+			/* B only */
 			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
 				    "supported_rates_b\n",
-				    adapter->config_bands);
+				    priv->config_bands);
 			k = nxpwifi_copy_rates(rates, k, supported_rates_b,
 					       sizeof(supported_rates_b));
-			break;
-		case BAND_G:
-		case BAND_G | BAND_GN:
+		} else if (bands == BAND_G) {
+			/* G only */
 			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
 				    "supported_rates_g\n",
-				    adapter->config_bands);
+				    priv->config_bands);
 			k = nxpwifi_copy_rates(rates, k, supported_rates_g,
 					       sizeof(supported_rates_g));
-			break;
-		case BAND_B | BAND_G:
-		case BAND_A | BAND_B | BAND_G:
-		case BAND_A | BAND_B:
-		case BAND_A | BAND_B | BAND_G | BAND_GN | BAND_AN:
-		case BAND_A | BAND_B | BAND_G | BAND_GN | BAND_AN | BAND_AAC:
-		case BAND_B | BAND_G | BAND_GN:
+		} else if (bands & (BAND_B | BAND_G)) {
+			/* BG only */
 			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
 				    "supported_rates_bg\n",
-				    adapter->config_bands);
+				    priv->config_bands);
 			k = nxpwifi_copy_rates(rates, k, supported_rates_bg,
 					       sizeof(supported_rates_bg));
-			break;
-		case BAND_A:
-		case BAND_A | BAND_G:
+		} else if (bands & BAND_A) {
+			/* support A */
 			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
 				    "supported_rates_a\n",
-				    adapter->config_bands);
+				    priv->config_bands);
 			k = nxpwifi_copy_rates(rates, k, supported_rates_a,
 					       sizeof(supported_rates_a));
-			break;
-		case BAND_AN:
-		case BAND_A | BAND_AN:
-		case BAND_A | BAND_AN | BAND_AAC:
-		case BAND_A | BAND_G | BAND_AN | BAND_GN:
-		case BAND_A | BAND_G | BAND_AN | BAND_GN | BAND_AAC:
-			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
-				    "supported_rates_a\n",
-				    adapter->config_bands);
-			k = nxpwifi_copy_rates(rates, k, supported_rates_a,
-					       sizeof(supported_rates_a));
-			break;
-		case BAND_GN:
-			nxpwifi_dbg(adapter, INFO, "info: infra band=%d\t"
-				    "supported_rates_n\n",
-				    adapter->config_bands);
-			k = nxpwifi_copy_rates(rates, k, supported_rates_n,
-					       sizeof(supported_rates_n));
-			break;
 		}
 	}
 

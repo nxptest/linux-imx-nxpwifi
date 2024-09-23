@@ -732,14 +732,14 @@ void nxpwifi_set_ba_params(struct nxpwifi_private *priv)
 
 	if (GET_BSS_ROLE(priv) == NXPWIFI_BSS_ROLE_UAP) {
 		priv->add_ba_param.tx_win_size =
-						NXPWIFI_UAP_AMPDU_DEF_TXWINSIZE;
+			NXPWIFI_UAP_AMPDU_DEF_TXWINSIZE;
 		priv->add_ba_param.rx_win_size =
-						NXPWIFI_UAP_AMPDU_DEF_RXWINSIZE;
+			NXPWIFI_UAP_AMPDU_DEF_RXWINSIZE;
 	} else {
 		priv->add_ba_param.tx_win_size =
-						NXPWIFI_STA_AMPDU_DEF_TXWINSIZE;
+			NXPWIFI_STA_AMPDU_DEF_TXWINSIZE;
 		priv->add_ba_param.rx_win_size =
-						NXPWIFI_STA_AMPDU_DEF_RXWINSIZE;
+			NXPWIFI_STA_AMPDU_DEF_RXWINSIZE;
 	}
 
 	priv->add_ba_param.tx_amsdu = true;
