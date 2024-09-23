@@ -1260,8 +1260,7 @@ static void nxpwifi_uninit_sw(struct nxpwifi_adapter *adapter)
 		priv = adapter->priv[i];
 		if (priv && priv->netdev) {
 			nxpwifi_stop_net_dev_queue(priv->netdev, adapter);
-			if (netif_carrier_ok(priv->netdev))
-				netif_carrier_off(priv->netdev);
+			netif_carrier_off(priv->netdev);
 			netif_device_detach(priv->netdev);
 		}
 	}

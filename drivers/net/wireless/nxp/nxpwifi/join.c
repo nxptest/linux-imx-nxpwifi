@@ -769,8 +769,7 @@ int nxpwifi_ret_802_11_associate(struct nxpwifi_private *priv,
 	nxpwifi_ralist_add(priv,
 			   priv->curr_bss_params.bss_descriptor.mac_address);
 
-	if (!netif_carrier_ok(priv->netdev))
-		netif_carrier_on(priv->netdev);
+	netif_carrier_on(priv->netdev);
 	nxpwifi_wake_up_net_dev_queue(priv->netdev, adapter);
 
 	if (priv->sec_info.wpa_enabled || priv->sec_info.wpa2_enabled)

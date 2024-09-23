@@ -1727,8 +1727,7 @@ static int nxpwifi_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 		goto done;
 	}
 
-	if (netif_carrier_ok(priv->netdev))
-		netif_carrier_off(priv->netdev);
+	netif_carrier_off(priv->netdev);
 	nxpwifi_stop_net_dev_queue(priv->netdev, priv->adapter);
 
 done:
@@ -1855,8 +1854,7 @@ static int nxpwifi_cfg80211_start_ap(struct wiphy *wiphy,
 	if (ret)
 		goto done;
 
-	if (!netif_carrier_ok(priv->netdev))
-		netif_carrier_on(priv->netdev);
+	netif_carrier_on(priv->netdev);
 	nxpwifi_wake_up_net_dev_queue(priv->netdev, priv->adapter);
 
 	memcpy(&priv->bss_cfg, bss_cfg, sizeof(priv->bss_cfg));
@@ -2596,8 +2594,7 @@ int nxpwifi_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 		nxpwifi_write_data_complete(priv->adapter, skb, 0, -1);
 	}
 
-	if (netif_carrier_ok(priv->netdev))
-		netif_carrier_off(priv->netdev);
+	netif_carrier_off(priv->netdev);
 
 	if (wdev->netdev->reg_state == NETREG_REGISTERED)
 		cfg80211_unregister_netdevice(wdev->netdev);
@@ -3172,8 +3169,7 @@ nxpwifi_cfg80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 		return -EINVAL;
 
 	if (params->block_tx) {
-		if (netif_carrier_ok(priv->netdev))
-			netif_carrier_off(priv->netdev);
+		netif_carrier_off(priv->netdev);
 		nxpwifi_stop_net_dev_queue(priv->netdev, priv->adapter);
 		priv->uap_stop_tx = true;
 	}

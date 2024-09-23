@@ -424,8 +424,7 @@ void nxpwifi_dfs_chan_sw_work(struct work_struct *work)
 	mutex_unlock(&priv->wdev.mtx);
 
 	if (priv->uap_stop_tx) {
-		if (!netif_carrier_ok(priv->netdev))
-			netif_carrier_on(priv->netdev);
+		netif_carrier_on(priv->netdev);
 		nxpwifi_wake_up_net_dev_queue(priv->netdev, adapter);
 		priv->uap_stop_tx = false;
 	}

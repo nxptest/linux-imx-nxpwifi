@@ -35,8 +35,7 @@ nxpwifi_sta_event_link_sensed(struct nxpwifi_private *priv)
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
 
-	if (!netif_carrier_ok(priv->netdev))
-		netif_carrier_on(priv->netdev);
+	netif_carrier_on(priv->netdev);
 	nxpwifi_wake_up_net_dev_queue(priv->netdev, adapter);
 
 	return 0;
@@ -659,8 +658,7 @@ void nxpwifi_reset_connect_state(struct nxpwifi_private *priv, u16 reason_code,
 	eth_zero_addr(priv->cfg_bssid);
 
 	nxpwifi_stop_net_dev_queue(priv->netdev, adapter);
-	if (netif_carrier_ok(priv->netdev))
-		netif_carrier_off(priv->netdev);
+	netif_carrier_off(priv->netdev);
 
 	if (!ISSUPP_FIRMWARE_SUPPLICANT(priv->adapter->fw_cap_info))
 		return;
