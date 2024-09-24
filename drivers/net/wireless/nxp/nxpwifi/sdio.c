@@ -13,7 +13,6 @@
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 
-#include "decl.h"
 #include "cfg.h"
 #include "util.h"
 #include "fw.h"

@@ -7,7 +7,6 @@
 
 #include <uapi/linux/ipv6.h>
 #include <net/ndisc.h>
-#include "decl.h"
 #include "cfg.h"
 #include "util.h"
 #include "fw.h"

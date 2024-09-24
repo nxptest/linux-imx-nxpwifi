@@ -37,7 +37,6 @@
 #include <linux/of_irq.h>
 #include <linux/workqueue.h>
 
-#include "decl.h"
 #include "cfg.h"
 #include "util.h"
 #include "fw.h"

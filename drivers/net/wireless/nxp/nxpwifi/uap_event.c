@@ -5,7 +5,7 @@
  * Copyright 2011-2024 NXP
  */
 
-#include "decl.h"
+#include "cfg.h"
 #include "main.h"
 #include "cmdevt.h"
 #include "11n.h"

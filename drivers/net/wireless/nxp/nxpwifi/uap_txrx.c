@@ -5,7 +5,6 @@
  * Copyright 2011-2024 NXP
  */
 
-#include "decl.h"
 #include "cfg.h"
 #include "main.h"
 #include "wmm.h"
