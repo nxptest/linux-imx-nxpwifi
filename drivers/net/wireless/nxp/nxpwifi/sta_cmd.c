@@ -666,7 +666,8 @@ nxpwifi_cmd_sta_rf_antenna(struct nxpwifi_private *priv,
 						host_cmd_ds_rf_ant_siso) +
 						S_DS_GEN);
 			ant_siso->action = cpu_to_le16(HOST_ACT_SET_BOTH);
-			ant_siso->ant_mode = cpu_to_le16((u16)ant_cfg->tx_ant);
+			ant_siso->ant_mode = cpu_to_le16((u16)ant_cfg->antenna_mode);
+			ant_siso->evaluate_time = cpu_to_le16((u16)ant_cfg->evaluate_time);
 		}
 		break;
 	case HOST_ACT_GEN_GET:
@@ -696,6 +697,7 @@ nxpwifi_ret_sta_rf_antenna(struct nxpwifi_private *priv,
 	struct host_cmd_ds_rf_ant_mimo *ant_mimo = &resp->params.ant_mimo;
 	struct host_cmd_ds_rf_ant_siso *ant_siso = &resp->params.ant_siso;
 	struct nxpwifi_adapter *adapter = priv->adapter;
+	struct nxpwifi_ds_ant_cfg *ant_cfg = NULL;
 
 	if (adapter->hw_dev_mcs_support == HT_STREAM_2X2) {
 		priv->tx_ant = le16_to_cpu(ant_mimo->tx_ant_mode);
@@ -708,12 +710,20 @@ nxpwifi_ret_sta_rf_antenna(struct nxpwifi_private *priv,
 			    le16_to_cpu(ant_mimo->action_rx),
 			    le16_to_cpu(ant_mimo->rx_ant_mode));
 	} else {
-		priv->tx_ant = le16_to_cpu(ant_siso->ant_mode);
-		priv->rx_ant = le16_to_cpu(ant_siso->ant_mode);
+		if (data_buf) {
+			ant_cfg = (struct nxpwifi_ds_ant_cfg *)data_buf;
+			ant_cfg->antenna_mode = le16_to_cpu(ant_siso->ant_mode);
+			ant_cfg->evaluate_time = le16_to_cpu(ant_siso->evaluate_time);
+			ant_cfg->tx_ant = le16_to_cpu(ant_siso->current_antenna);
+			ant_cfg->rx_ant = le16_to_cpu(ant_siso->current_antenna);
+		}
+
+		priv->tx_ant = le16_to_cpu(ant_siso->current_antenna);
+		priv->rx_ant = le16_to_cpu(ant_siso->current_antenna);
 		nxpwifi_dbg(adapter, INFO,
 			    "RF_ANT_RESP: action = 0x%x, Mode = 0x%04x\n",
 			    le16_to_cpu(ant_siso->action),
-			    le16_to_cpu(ant_siso->ant_mode));
+			    le16_to_cpu(ant_siso->current_antenna));
 	}
 	return 0;
 }

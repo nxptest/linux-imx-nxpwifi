@@ -600,6 +600,8 @@ struct nxpwifi_ds_11n_amsdu_aggr_ctrl {
 struct nxpwifi_ds_ant_cfg {
 	u32 tx_ant;
 	u32 rx_ant;
+	u16 antenna_mode;
+	u16 evaluate_time;
 };
 
 #define NXPWIFI_NUM_OF_CMD_BUFFER	50

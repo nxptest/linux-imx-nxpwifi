@@ -19,6 +19,12 @@ struct
 };
 #endif
 
+static const struct
+nla_policy nxpwifi_vendor_attr_policy[NXPWIFI_ATTR_CSI_MAX + 1] = {
+	[NXPWIFI_ATTR_ANTENNA_MODE] = { .type = NLA_U16 },
+	[NXPWIFI_ATTR_SAD_EVAL_TIME] = { .type = NLA_U16 },
+};
+
 static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
 				      struct wireless_dev *wdev,
 				      const void *data,
@@ -468,6 +474,74 @@ done:
 
 }
 
+static int nxpwifi_vendor_antenna_cfg(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	struct nlattr *tb_vendor[NXPWIFI_ATTR_CSI_MAX + 1];
+	struct nxpwifi_ds_ant_cfg *ant_cfg;
+	int ret = 0;
+	struct sk_buff *resp;
+
+	//if (data_len == 0)
+	//	return -EINVAL;
+
+	ant_cfg = kzalloc(sizeof(*ant_cfg), GFP_KERNEL);
+
+	if (ant_cfg == NULL) {
+		return -ENOMEM;
+	}
+
+	nla_parse(tb_vendor, NXPWIFI_ATTR_CSI_MAX, (struct nlattr *)data, data_len,
+			  NULL,
+			  NULL);
+
+	if (!tb_vendor[NXPWIFI_ATTR_ANTENNA_MODE]) {
+		nxpwifi_dbg(priv->adapter, ERROR, "Could not find antenna config attr! It is get command\n");
+		ret = nxpwifi_set_antenna(priv, HOST_ACT_GEN_GET, NXPWIFI_SYNC_CMD,
+				    	   ant_cfg);
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(ant_cfg->antenna_mode));
+
+		if (!resp)
+			return -ENOMEM;
+
+		if (nla_put_u16(resp, NXPWIFI_ATTR_ANTENNA_MODE,
+			    ant_cfg->antenna_mode)) {
+			nxpwifi_dbg(priv->adapter, ERROR, "put ant mode error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+
+	} else {
+		ant_cfg->tx_ant = 0;
+		ant_cfg->rx_ant = 0;
+
+		ant_cfg->antenna_mode = nla_get_u16(
+			tb_vendor[NXPWIFI_ATTR_ANTENNA_MODE]);
+
+		if (tb_vendor[NXPWIFI_ATTR_SAD_EVAL_TIME]) {
+			ant_cfg->evaluate_time = nla_get_u16(
+				tb_vendor[NXPWIFI_ATTR_SAD_EVAL_TIME]);
+		} else {
+			ant_cfg->evaluate_time = 0;
+		}
+		nxpwifi_dbg(priv->adapter, ERROR, "%s tx_ant %d rx_ant %d antenna_mode %x evaluate_time %d\n", __FUNCTION__, ant_cfg->tx_ant, ant_cfg->rx_ant, ant_cfg->antenna_mode, ant_cfg->evaluate_time);
+
+		ret = nxpwifi_set_antenna(priv, HOST_ACT_GEN_SET, NXPWIFI_SYNC_CMD,
+				    	   ant_cfg);
+	}
+done:
+	kfree(ant_cfg);
+
+	return ret;
+
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -530,6 +604,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_channel_switch,
+		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_ANTCFG,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_antenna_cfg,
 		.policy = VENDOR_CMD_RAW_DATA,
 	}
 };

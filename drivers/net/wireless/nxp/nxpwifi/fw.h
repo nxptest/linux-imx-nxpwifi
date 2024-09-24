@@ -1388,6 +1388,8 @@ struct host_cmd_ds_rf_ant_mimo {
 struct host_cmd_ds_rf_ant_siso {
 	__le16 action;
 	__le16 ant_mode;
+	__le16 evaluate_time;
+	__le16 current_antenna;
 } __packed;
 
 #define BAND_CFG_CHAN_BAND_MASK		0x03

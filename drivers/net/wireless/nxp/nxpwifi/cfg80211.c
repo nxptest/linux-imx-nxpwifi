@@ -1635,6 +1635,11 @@ nxpwifi_cfg80211_set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
 			tx_ant = RF_ANTENNA_AUTO;
 			rx_ant = RF_ANTENNA_AUTO;
 		}
+
+		if (tx_ant == RF_ANTENNA_AUTO)
+			ant_cfg.antenna_mode = RF_ANTENNA_AUTO;
+		else
+			ant_cfg.antenna_mode = 1 << (tx_ant - 1);
 	} else {
 		struct ieee80211_sta_ht_cap *ht_info;
 		int rx_mcs_supp;
