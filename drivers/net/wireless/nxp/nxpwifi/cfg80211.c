@@ -690,9 +690,6 @@ nxpwifi_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 
 	switch (priv->bss_role) {
 	case NXPWIFI_BSS_ROLE_UAP:
-		if (priv->bss_started)
-			break;
-
 		bss_cfg = kzalloc(sizeof(*bss_cfg), GFP_KERNEL);
 		if (!bss_cfg) {
 			ret = -ENOMEM;
@@ -720,9 +717,6 @@ nxpwifi_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed)
 		break;
 
 	case NXPWIFI_BSS_ROLE_STA:
-		if (priv->media_connected)
-			break;
-
 		if (changed & WIPHY_PARAM_RTS_THRESHOLD) {
 			ret = nxpwifi_set_rts(priv,
 					      wiphy->rts_threshold);
