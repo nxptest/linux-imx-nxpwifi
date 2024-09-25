@@ -1451,7 +1451,7 @@ struct nxpwifi_scan_cmd_config {
 	 *  TLV_TYPE_CHANLIST, nxpwifi_ie_types_chan_list_param_set
 	 *  WLAN_EID_SSID, nxpwifi_ie_types_ssid_param_set
 	 */
-	u8 tlv_buf[1];	/* SSID TLV(s) and ChanList TLVs are stored here */
+	u8 tlv_buf[];	/* SSID TLV(s) and ChanList TLVs are stored here */
 } __packed;
 
 struct nxpwifi_user_scan_chan {

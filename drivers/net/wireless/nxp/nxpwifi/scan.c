@@ -624,8 +624,8 @@ nxpwifi_scan_channel_list(struct nxpwifi_private *priv,
 			 * of the tlv buffer.  This compensates for any TLVs
 			 * that were appended before the channel list.
 			 */
-			scan_cfg_out->tlv_buf_len = (u32)((u8 *)tlv_o -
-							scan_cfg_out->tlv_buf);
+			scan_cfg_out->tlv_buf_len =
+				(u32)((u8 *)tlv_o - scan_cfg_out->tlv_buf);
 
 			/* Add the size of the channel tlv header and the data
 			 * length
