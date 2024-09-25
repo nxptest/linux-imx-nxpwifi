@@ -2468,8 +2468,7 @@ int nxpwifi_ret_802_11_scan_ext(struct nxpwifi_private *priv,
 	ext_scan_resp = &resp->params.ext_scan;
 
 	tlv = (void *)ext_scan_resp->tlv_buffer;
-	buf_left = le16_to_cpu(resp->size) - (sizeof(*ext_scan_resp) + S_DS_GEN
-					      - 1);
+	buf_left = le16_to_cpu(resp->size) - (sizeof(*ext_scan_resp) + S_DS_GEN);
 
 	while (buf_left >= sizeof(struct nxpwifi_ie_types_header)) {
 		type = le16_to_cpu(tlv->type);
