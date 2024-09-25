@@ -3829,11 +3829,25 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 
 	wiphy->max_num_akm_suites = CFG80211_MAX_NUM_AKM_SUITES;
 
-	wiphy->bands[NL80211_BAND_2GHZ] = &nxpwifi_band_2ghz;
-	if (adapter->fw_bands & BAND_A)
-		wiphy->bands[NL80211_BAND_5GHZ] = &nxpwifi_band_5ghz;
-	else
+	wiphy->bands[NL80211_BAND_2GHZ] =
+		devm_kmemdup(adapter->dev, &nxpwifi_band_2ghz,
+			     sizeof(nxpwifi_band_2ghz), GFP_KERNEL);
+	if (!wiphy->bands[NL80211_BAND_2GHZ]) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	if (adapter->fw_bands & BAND_A) {
+		wiphy->bands[NL80211_BAND_5GHZ] =
+			devm_kmemdup(adapter->dev, &nxpwifi_band_5ghz,
+				     sizeof(nxpwifi_band_5ghz), GFP_KERNEL);
+		if (!wiphy->bands[NL80211_BAND_5GHZ]) {
+			ret = -ENOMEM;
+			goto err;
+		}
+	} else {
 		wiphy->bands[NL80211_BAND_5GHZ] = NULL;
+	}
 
 	ht_cap = &wiphy->bands[NL80211_BAND_2GHZ]->ht_cap;
 	nxpwifi_setup_ht_caps(priv, ht_cap);
@@ -3937,8 +3951,7 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 	if (ret < 0) {
 		nxpwifi_dbg(adapter, ERROR,
 			    "%s: wiphy_register failed: %d\n", __func__, ret);
-		wiphy_free(wiphy);
-		return ret;
+		goto err;
 	}
 
 	if (!adapter->regd) {
@@ -3973,4 +3986,9 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 
 	adapter->wiphy = wiphy;
 	return ret;
+
+err:
+	wiphy_free(wiphy);
+	return ret;
+
 }
