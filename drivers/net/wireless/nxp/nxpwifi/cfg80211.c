@@ -3688,7 +3688,7 @@ nxpwifi_cfg80211_probe_client(struct wiphy *wiphy,
 }
 
 /* station cfg80211 operations */
-static struct cfg80211_ops nxpwifi_cfg80211_ops = {
+static const struct cfg80211_ops nxpwifi_cfg80211_ops = {
 	.add_virtual_intf = nxpwifi_add_virtual_intf,
 	.del_virtual_intf = nxpwifi_del_virtual_intf,
 	.change_virtual_intf = nxpwifi_cfg80211_change_virtual_intf,
