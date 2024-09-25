@@ -389,8 +389,6 @@ nxpwifi_wmm_init(struct nxpwifi_adapter *adapter)
 
 	for (j = 0; j < adapter->priv_num; ++j) {
 		priv = adapter->priv[j];
-		if (!priv)
-			continue;
 
 		for (i = 0; i < MAX_NUM_TID; ++i) {
 			if (!disable_tx_amsdu &&
@@ -432,8 +430,6 @@ bool nxpwifi_bypass_txlist_empty(struct nxpwifi_adapter *adapter)
 
 	for (i = 0; i < adapter->priv_num; i++) {
 		priv = adapter->priv[i];
-		if (!priv)
-			continue;
 		if (!skb_queue_empty(&priv->bypass_txq))
 			return false;
 	}
@@ -450,8 +446,6 @@ bool nxpwifi_wmm_lists_empty(struct nxpwifi_adapter *adapter)
 
 	for (i = 0; i < adapter->priv_num; ++i) {
 		priv = adapter->priv[i];
-		if (!priv)
-			continue;
 		if (!priv->port_open)
 			continue;
 		if (atomic_read(&priv->wmm.tx_pkts_queued))
@@ -1334,9 +1328,6 @@ void nxpwifi_process_bypass_tx(struct nxpwifi_adapter *adapter)
 
 	for (i = 0; i < adapter->priv_num; ++i) {
 		priv = adapter->priv[i];
-
-		if (!priv)
-			continue;
 
 		if (skb_queue_empty(&priv->bypass_txq))
 			continue;

@@ -105,9 +105,7 @@ nxpwifi_space_avail_for_new_ba_stream(struct nxpwifi_adapter *adapter)
 
 	for (i = 0; i < adapter->priv_num; i++) {
 		priv = adapter->priv[i];
-		if (priv)
-			ba_stream_num +=
-				list_count_nodes(&priv->tx_ba_stream_tbl_ptr);
+		ba_stream_num += list_count_nodes(&priv->tx_ba_stream_tbl_ptr);
 	}
 
 	if (adapter->fw_api_ver == NXPWIFI_FW_V15) {

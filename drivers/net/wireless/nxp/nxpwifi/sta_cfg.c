@@ -449,8 +449,7 @@ bool nxpwifi_enable_hs(struct nxpwifi_adapter *adapter)
 	if (disconnect_on_suspend) {
 		for (i = 0; i < adapter->priv_num; i++) {
 			priv = adapter->priv[i];
-			if (priv)
-				nxpwifi_deauthenticate(priv, NULL);
+			nxpwifi_deauthenticate(priv, NULL);
 		}
 	}
 

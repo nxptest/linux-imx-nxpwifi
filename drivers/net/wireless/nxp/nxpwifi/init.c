@@ -337,14 +337,12 @@ static void nxpwifi_invalidate_lists(struct nxpwifi_adapter *adapter)
 		list_del(&adapter->bss_prio_tbl[i].bss_prio_head);
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			priv = adapter->priv[i];
-			for (j = 0; j < MAX_NUM_TID; ++j)
-				list_del(&priv->wmm.tid_tbl_ptr[j].ra_list);
-			list_del(&priv->tx_ba_stream_tbl_ptr);
-			list_del(&priv->rx_reorder_tbl_ptr);
-			list_del(&priv->sta_list);
-		}
+		priv = adapter->priv[i];
+		for (j = 0; j < MAX_NUM_TID; ++j)
+			list_del(&priv->wmm.tid_tbl_ptr[j].ra_list);
+		list_del(&priv->tx_ba_stream_tbl_ptr);
+		list_del(&priv->rx_reorder_tbl_ptr);
+		list_del(&priv->sta_list);
 	}
 }
 
@@ -399,12 +397,10 @@ void nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
 	spin_lock_init(&adapter->nxpwifi_cmd_lock);
 	spin_lock_init(&adapter->queue_lock);
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			priv = adapter->priv[i];
-			spin_lock_init(&priv->wmm.ra_list_spinlock);
-			spin_lock_init(&priv->curr_bcn_buf_lock);
-			spin_lock_init(&priv->sta_list_spinlock);
-		}
+		priv = adapter->priv[i];
+		spin_lock_init(&priv->wmm.ra_list_spinlock);
+		spin_lock_init(&priv->curr_bcn_buf_lock);
+		spin_lock_init(&priv->sta_list_spinlock);
 	}
 
 	/* Initialize cmd_free_q */
@@ -428,8 +424,6 @@ void nxpwifi_init_lock_list(struct nxpwifi_adapter *adapter)
 	}
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (!adapter->priv[i])
-			continue;
 		priv = adapter->priv[i];
 		for (j = 0; j < MAX_NUM_TID; ++j)
 			INIT_LIST_HEAD(&priv->wmm.tid_tbl_ptr[j].ra_list);
@@ -475,25 +469,21 @@ int nxpwifi_init_fw(struct nxpwifi_adapter *adapter)
 	nxpwifi_init_adapter(adapter);
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			priv = adapter->priv[i];
+		priv = adapter->priv[i];
 
-			/* Initialize private structure */
-			ret = nxpwifi_init_priv(priv);
-			if (ret)
-				return ret;
-		}
+		/* Initialize private structure */
+		ret = nxpwifi_init_priv(priv);
+		if (ret)
+			return ret;
 	}
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			ret = nxpwifi_sta_init_cmd(adapter->priv[i],
-						   first_sta, true);
-			if (ret && ret != -EINPROGRESS)
-				return ret;
+		ret = nxpwifi_sta_init_cmd(adapter->priv[i],
+					   first_sta, true);
+		if (ret && ret != -EINPROGRESS)
+			return ret;
 
-			first_sta = false;
-		}
+		first_sta = false;
 	}
 
 	spin_lock_bh(&adapter->cmd_pending_q_lock);
@@ -594,12 +584,10 @@ nxpwifi_shutdown_drv(struct nxpwifi_adapter *adapter)
 
 	/* Clean up Tx/Rx queues and delete BSS priority table */
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			priv = adapter->priv[i];
+		priv = adapter->priv[i];
 
-			nxpwifi_abort_cac(priv);
-			nxpwifi_free_priv(priv);
-		}
+		nxpwifi_abort_cac(priv);
+		nxpwifi_free_priv(priv);
 	}
 
 	atomic_set(&adapter->tx_queued, 0);

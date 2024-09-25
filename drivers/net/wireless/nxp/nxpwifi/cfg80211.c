@@ -2845,7 +2845,7 @@ static int nxpwifi_cfg80211_suspend(struct wiphy *wiphy,
 
 	for (i = 0; i < adapter->priv_num; i++) {
 		priv = adapter->priv[i];
-		if (priv && priv->netdev)
+		if (priv->netdev)
 			netif_device_detach(priv->netdev);
 	}
 
@@ -2917,7 +2917,7 @@ static int nxpwifi_cfg80211_resume(struct wiphy *wiphy)
 
 	for (i = 0; i < adapter->priv_num; i++) {
 		priv = adapter->priv[i];
-		if (priv && priv->netdev)
+		if (priv->netdev)
 			netif_device_attach(priv->netdev);
 	}
 

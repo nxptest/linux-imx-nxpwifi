@@ -1156,14 +1156,12 @@ nxpwifi_get_priv_by_id(struct nxpwifi_adapter *adapter,
 	int i;
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			if (adapter->priv[i]->bss_mode ==
-			    NL80211_IFTYPE_UNSPECIFIED)
-				continue;
-			if (adapter->priv[i]->bss_num == bss_num &&
-			    adapter->priv[i]->bss_type == bss_type)
-				break;
-		}
+		if (adapter->priv[i]->bss_mode ==
+		    NL80211_IFTYPE_UNSPECIFIED)
+			continue;
+		if (adapter->priv[i]->bss_num == bss_num &&
+		    adapter->priv[i]->bss_type == bss_type)
+			break;
 	}
 	return ((i < adapter->priv_num) ? adapter->priv[i] : NULL);
 }
@@ -1178,11 +1176,9 @@ nxpwifi_get_priv(struct nxpwifi_adapter *adapter,
 	int i;
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (adapter->priv[i]) {
-			if (bss_role == NXPWIFI_BSS_ROLE_ANY ||
-			    GET_BSS_ROLE(adapter->priv[i]) == bss_role)
-				break;
-		}
+		if (bss_role == NXPWIFI_BSS_ROLE_ANY ||
+		    GET_BSS_ROLE(adapter->priv[i]) == bss_role)
+			break;
 	}
 
 	return ((i < adapter->priv_num) ? adapter->priv[i] : NULL);
@@ -1199,12 +1195,10 @@ nxpwifi_get_unused_bss_num(struct nxpwifi_adapter *adapter, u8 bss_type)
 
 	memset(index, 0, sizeof(index));
 	for (i = 0; i < adapter->priv_num; i++)
-		if (adapter->priv[i]) {
-			if (adapter->priv[i]->bss_type == bss_type &&
-			    !(adapter->priv[i]->bss_mode ==
-			      NL80211_IFTYPE_UNSPECIFIED)) {
-				index[adapter->priv[i]->bss_num] = 1;
-			}
+		if (adapter->priv[i]->bss_type == bss_type &&
+		    !(adapter->priv[i]->bss_mode ==
+		      NL80211_IFTYPE_UNSPECIFIED)) {
+			index[adapter->priv[i]->bss_num] = 1;
 		}
 	for (j = 0; j < NXPWIFI_MAX_BSS_NUM; j++)
 		if (!index[j])
@@ -1266,18 +1260,16 @@ nxpwifi_11h_get_csa_closed_channel(struct nxpwifi_private *priv)
 
 static inline u8 nxpwifi_is_any_intf_active(struct nxpwifi_private *priv)
 {
-	struct nxpwifi_private *priv_num;
+	struct nxpwifi_private *priv_tmp;
 	int i;
 
 	for (i = 0; i < priv->adapter->priv_num; i++) {
-		priv_num = priv->adapter->priv[i];
-		if (priv_num) {
-			if ((GET_BSS_ROLE(priv_num) == NXPWIFI_BSS_ROLE_UAP &&
-			     priv_num->bss_started) ||
-			    (GET_BSS_ROLE(priv_num) == NXPWIFI_BSS_ROLE_STA &&
-			     priv_num->media_connected))
-				return 1;
-		}
+		priv_tmp = priv->adapter->priv[i];
+		if ((GET_BSS_ROLE(priv_tmp) == NXPWIFI_BSS_ROLE_UAP &&
+		     priv_tmp->bss_started) ||
+		    (GET_BSS_ROLE(priv_tmp) == NXPWIFI_BSS_ROLE_STA &&
+		     priv_tmp->media_connected))
+			return 1;
 	}
 
 	return 0;

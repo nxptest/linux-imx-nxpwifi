@@ -821,8 +821,6 @@ void nxpwifi_update_ampdu_txwinsize(struct nxpwifi_adapter *adapter)
 	struct nxpwifi_private *priv;
 
 	for (i = 0; i < adapter->priv_num; i++) {
-		if (!adapter->priv[i])
-			continue;
 		priv = adapter->priv[i];
 		tx_win_size = priv->add_ba_param.tx_win_size;
 

@@ -893,8 +893,7 @@ void nxpwifi_deauthenticate_all(struct nxpwifi_adapter *adapter)
 
 	for (i = 0; i < adapter->priv_num; i++) {
 		priv = adapter->priv[i];
-		if (priv)
-			nxpwifi_deauthenticate(priv, NULL);
+		nxpwifi_deauthenticate(priv, NULL);
 	}
 }
 EXPORT_SYMBOL_GPL(nxpwifi_deauthenticate_all);

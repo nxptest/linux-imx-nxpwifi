@@ -1991,8 +1991,6 @@ void nxpwifi_cancel_scan(struct nxpwifi_adapter *adapter)
 		spin_unlock_bh(&adapter->nxpwifi_cmd_lock);
 		for (i = 0; i < adapter->priv_num; i++) {
 			priv = adapter->priv[i];
-			if (!priv)
-				continue;
 			if (priv->scan_request) {
 				struct cfg80211_scan_info info = {
 					.aborted = true,
