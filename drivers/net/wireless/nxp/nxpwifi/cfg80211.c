@@ -3827,6 +3827,8 @@ int nxpwifi_register_cfg80211(struct nxpwifi_adapter *adapter)
 	wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 				 BIT(NL80211_IFTYPE_AP);
 
+	wiphy->max_num_akm_suites = CFG80211_MAX_NUM_AKM_SUITES;
+
 	wiphy->bands[NL80211_BAND_2GHZ] = &nxpwifi_band_2ghz;
 	if (adapter->fw_bands & BAND_A)
 		wiphy->bands[NL80211_BAND_5GHZ] = &nxpwifi_band_5ghz;
