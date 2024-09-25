@@ -2638,7 +2638,7 @@ static struct nxpwifi_if_ops sdio_ops = {
 	.up_dev = nxpwifi_sdio_up_dev,
 };
 
-module_driver(nxpwifi_sdio, sdio_register_driver, sdio_unregister_driver);
+module_sdio_driver(nxpwifi_sdio);
 
 MODULE_AUTHOR("NXP International Ltd.");
 MODULE_DESCRIPTION("NXP WiFi SDIO Driver version " SDIO_VERSION);
