@@ -1008,7 +1008,7 @@ int nxpwifi_set_11ax_status(struct nxpwifi_private *priv,
 {
 	struct nxpwifi_11ax_he_cfg ax_cfg;
 	u8 band = bss_cfg->band_cfg & BAND_CFG_CHAN_BAND_MASK;
-	struct element *he_cap;
+	const struct element *he_cap;
 	int ret;
 
 	if (band == BAND_2GHZ)
