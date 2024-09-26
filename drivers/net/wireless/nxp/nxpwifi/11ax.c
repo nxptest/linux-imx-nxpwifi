@@ -359,7 +359,7 @@ int nxpwifi_ret_11ax_cmd(struct nxpwifi_private *priv,
 		ax_cmd->param.htc_cfg.value = *he_cmd->val;
 		break;
 	case NXPWIFI_11AXCMD_TXOMI_SUBID:
-		memcpy(&ax_cmd->param.txomi_cfg.omi,
+		memcpy(&ax_cmd->param.txomi_cfg,
 		       he_cmd->val, sizeof(ax_cmd->param.txomi_cfg));
 		break;
 	case NXPWIFI_11AXCMD_OBSS_TOLTIME_SUBID:
@@ -374,7 +374,7 @@ int nxpwifi_ret_11ax_cmd(struct nxpwifi_private *priv,
 		ax_cmd->param.setbsrp_cfg.value = *he_cmd->val;
 		break;
 	case NXPWIFI_11AXCMD_LLDE_SUBID:
-		memcpy(&ax_cmd->param.llde_cfg.llde,
+		memcpy(&ax_cmd->param.llde_cfg,
 		       he_cmd->val, sizeof(ax_cmd->param.llde_cfg));
 		break;
 	default:
