@@ -1030,7 +1030,7 @@ int nxpwifi_set_11ax_status(struct nxpwifi_private *priv,
 	if (he_cap) {
 		ax_cfg.he_cap_cfg.id = he_cap->id;
 		ax_cfg.he_cap_cfg.len = he_cap->datalen;
-		memcpy(&ax_cfg.he_cap_cfg.ext_id,
+		memcpy(ax_cfg.data + 4,
 		       he_cap->data,
 		       he_cap->datalen);
 	} else {

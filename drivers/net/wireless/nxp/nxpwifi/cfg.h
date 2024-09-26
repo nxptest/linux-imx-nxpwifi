@@ -733,9 +733,14 @@ struct nxpwifi_11ax_he_cap_cfg {
 	u8 val[28];
 };
 
+#define HE_CAP_MAX_SIZE   54
+
 struct nxpwifi_11ax_he_cfg {
 	u8 band;
-	struct nxpwifi_11ax_he_cap_cfg he_cap_cfg;
+	union {
+		struct nxpwifi_11ax_he_cap_cfg he_cap_cfg;
+		u8 data[HE_CAP_MAX_SIZE];
+	};
 };
 
 #define NXPWIFI_11AXCMD_CFG_ID_SR_OBSS_PD_OFFSET 1

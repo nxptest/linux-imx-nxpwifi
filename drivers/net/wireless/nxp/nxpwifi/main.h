@@ -598,9 +598,9 @@ struct nxpwifi_private {
 	u16 config_bands;
 	/* 11AX */
 	u8 user_he_cap_len;
-	u8 user_he_cap[54];
+	u8 user_he_cap[HE_CAP_MAX_SIZE];
 	u8 user_2g_he_cap_len;
-	u8 user_2g_he_cap[54];
+	u8 user_2g_he_cap[HE_CAP_MAX_SIZE];
 	bool host_mlme_reg;
 	u32 mgmt_frame_mask;
 	struct nxpwifi_roc_cfg roc_cfg;
@@ -927,9 +927,9 @@ struct nxpwifi_adapter {
 	/* 11AX */
 	u8 is_hw_11ax_capable;
 	u8 hw_he_cap_len;
-	u8 hw_he_cap[54];
+	u8 hw_he_cap[HE_CAP_MAX_SIZE];
 	u8 hw_2g_he_cap_len;
-	u8 hw_2g_he_cap[54];
+	u8 hw_2g_he_cap[HE_CAP_MAX_SIZE];
 	atomic_t pending_bridged_pkts;
 	/* For synchronizing FW initialization with device lifecycle. */
 	struct completion *fw_done;
