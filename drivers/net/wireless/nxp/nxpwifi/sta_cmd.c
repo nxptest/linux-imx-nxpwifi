@@ -3130,6 +3130,53 @@ static int nxpwifi_cmd_csi(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int nxpwifi_cmd_edmac_cfg(struct nxpwifi_private *priv,
+				 struct host_cmd_ds_command *cmd, u16 cmd_no,
+				 void *data_buf, u16 cmd_action, u32 cmd_type)
+{
+	struct host_cmd_ds_edmac_cfg *edmac_cmd = &cmd->params.ed_mac_cfg;
+	struct nxpwifi_ds_ed_mac_cfg *edmac_cfg =
+		(struct nxpwifi_ds_ed_mac_cfg *)data_buf;
+
+	cmd->command = cpu_to_le16(cmd_no);
+
+	if (cmd_action == HOST_ACT_GEN_SET) {
+		cmd->size = cpu_to_le16(sizeof(*edmac_cmd) + S_DS_GEN);
+
+		edmac_cmd->ed_ctrl_2g = cpu_to_le16(edmac_cfg->ed_ctrl_2g);
+		edmac_cmd->ed_offset_2g = cpu_to_le16(edmac_cfg->ed_offset_2g);
+		edmac_cmd->ed_ctrl_5g = cpu_to_le16(edmac_cfg->ed_ctrl_5g);
+		edmac_cmd->ed_offset_5g = cpu_to_le16(edmac_cfg->ed_offset_5g);
+		edmac_cmd->ed_bitmap_txq_lock =
+			cpu_to_le32(edmac_cfg->ed_bitmap_txq_lock);
+	} else {
+		cmd->size = cpu_to_le16(S_DS_GEN);
+	}
+
+	return 0;
+}
+
+static int nxpwifi_ret_edmac_cfg(struct nxpwifi_private *priv,
+				 struct host_cmd_ds_command *resp,
+				 u16 cmdresp_no, void *data_buf)
+{
+	struct host_cmd_ds_edmac_cfg *edmac_cmd = &resp->params.ed_mac_cfg;
+	struct nxpwifi_ds_ed_mac_cfg *edmac_cfg =
+		(struct nxpwifi_ds_ed_mac_cfg *)data_buf;
+
+	if (data_buf) {
+		edmac_cfg = (struct nxpwifi_ds_ed_mac_cfg *)data_buf;
+
+		edmac_cfg->ed_ctrl_2g = le16_to_cpu(edmac_cmd->ed_ctrl_2g);
+		edmac_cfg->ed_offset_2g = le16_to_cpu(edmac_cmd->ed_offset_2g);
+		edmac_cfg->ed_ctrl_5g = le16_to_cpu(edmac_cmd->ed_ctrl_5g);
+		edmac_cfg->ed_offset_5g = le16_to_cpu(edmac_cmd->ed_offset_5g);
+		edmac_cfg->ed_bitmap_txq_lock =
+			le32_to_cpu(edmac_cmd->ed_bitmap_txq_lock);
+	}
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3320,6 +3367,9 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_CSI,
 	.prepare_cmd = nxpwifi_cmd_csi,
 	.cmd_resp = NULL},
+	{.cmd_no = HOST_CMD_EDMAC_CFG,
+	.prepare_cmd = nxpwifi_cmd_edmac_cfg,
+	.cmd_resp = nxpwifi_ret_edmac_cfg}
 };
 
 /* This function prepares the commands before sending them to the firmware.

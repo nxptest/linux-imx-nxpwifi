@@ -25,6 +25,15 @@ nla_policy nxpwifi_vendor_attr_policy[NXPWIFI_ATTR_CSI_MAX + 1] = {
 	[NXPWIFI_ATTR_SAD_EVAL_TIME] = { .type = NLA_U16 },
 };
 
+static const struct
+nla_policy nxpwifi_edmac_policy[NXPWIFI_EDMAC_MAX + 1] = {
+	[NXPWIFI_EDMAC_CTRL_2G] = { .type = NLA_U16 },
+	[NXPWIFI_EDMAC_OFFSET_2G] = { .type = NLA_S16 },
+	[NXPWIFI_EDMAC_CTRL_5G] = { .type = NLA_U16 },
+	[NXPWIFI_EDMAC_OFFSET_5G] = { .type = NLA_S16 },
+	[NXPWIFI_EDMAC_TXQ_LOCK] = { .type = NLA_U32 },
+};
+
 static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
 				      struct wireless_dev *wdev,
 				      const void *data,
@@ -39,6 +48,10 @@ static int nxpwifi_vendor_cmd_hs_offload(struct wiphy *wiphy,
 					 struct wireless_dev *wdev,
 					 const void *data,
 					 int data_len);
+
+static int nxpwifi_vendor_edmac_cfg(struct wiphy *wiphy,
+				    struct wireless_dev *wdev, const void *data,
+				    int data_len);
 
 static int nxpwifi_vendor_cmd_hscfg(struct wiphy *wiphy,
 				    struct wireless_dev *wdev,
@@ -542,6 +555,101 @@ done:
 
 }
 
+static int nxpwifi_vendor_edmac_cfg(struct wiphy *wiphy,
+				    struct wireless_dev *wdev, const void *data,
+				    int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	struct nlattr *tb_vendor[NXPWIFI_EDMAC_MAX + 1];
+	struct nxpwifi_ds_ed_mac_cfg *edmac_cfg;
+	int ret = 0;
+	struct sk_buff *resp;
+
+	edmac_cfg = kzalloc(sizeof(*edmac_cfg), GFP_KERNEL);
+
+	if (!edmac_cfg)
+		return -ENOMEM;
+
+	nla_parse(tb_vendor, NXPWIFI_EDMAC_MAX, (struct nlattr *)data, data_len,
+		  nxpwifi_edmac_policy, NULL);
+
+	if (!tb_vendor[NXPWIFI_EDMAC_CTRL_2G]) {
+		nxpwifi_dbg(priv->adapter, INFO,
+			    "Could not find EDMAC attr! It's a GET command. Get EDMAC CFG from FW.\n");
+		ret = nxpwifi_set_edmac(priv, HOST_ACT_GEN_GET,
+					NXPWIFI_SYNC_CMD, edmac_cfg);
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, 32);
+
+		if (!resp)
+			return -ENOMEM;
+
+		if (nla_put_u16(resp, NXPWIFI_EDMAC_CTRL_2G,
+				edmac_cfg->ed_ctrl_2g)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put EDMAC_CTRL_2G attribute error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+
+		if (nla_put_u16(resp, NXPWIFI_EDMAC_OFFSET_2G,
+				edmac_cfg->ed_offset_2g)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put EDMAC_OFFSET_2G attribute error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+
+		if (nla_put_u16(resp, NXPWIFI_EDMAC_CTRL_5G,
+				edmac_cfg->ed_ctrl_5g)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put EDMAC_CTRL_5G attribute error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+
+		if (nla_put_u16(resp, NXPWIFI_EDMAC_OFFSET_5G,
+				edmac_cfg->ed_offset_5g)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put EDMAC_OFFSET_5G attribute error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+
+		if (nla_put_u32(resp, NXPWIFI_EDMAC_TXQ_LOCK,
+				edmac_cfg->ed_bitmap_txq_lock)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put EDMAC_TXQ_LOCK attribute error\n");
+			kfree_skb(resp);
+			return -ENOBUFS;
+		}
+
+		ret = cfg80211_vendor_cmd_reply(resp);
+
+	} else {
+		edmac_cfg->ed_ctrl_2g =
+			*(u16 *)nla_data(tb_vendor[NXPWIFI_EDMAC_CTRL_2G]);
+		edmac_cfg->ed_offset_2g =
+			*(s16 *)nla_data(tb_vendor[NXPWIFI_EDMAC_OFFSET_2G]);
+
+		edmac_cfg->ed_ctrl_5g =
+			*(u16 *)nla_data(tb_vendor[NXPWIFI_EDMAC_CTRL_5G]);
+		edmac_cfg->ed_offset_5g =
+			*(s16 *)nla_data(tb_vendor[NXPWIFI_EDMAC_OFFSET_5G]);
+
+		edmac_cfg->ed_bitmap_txq_lock =
+			*(u32 *)nla_data(tb_vendor[NXPWIFI_EDMAC_TXQ_LOCK]);
+		ret = nxpwifi_set_edmac(priv, HOST_ACT_GEN_SET,
+					NXPWIFI_SYNC_CMD, edmac_cfg);
+	}
+
+	kfree(edmac_cfg);
+
+	return ret;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -614,6 +722,16 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
 		.doit = nxpwifi_vendor_antenna_cfg,
 		.policy = VENDOR_CMD_RAW_DATA,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_EDMAC_CFG,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_edmac_cfg,
+		.policy = nxpwifi_edmac_policy,
+		.maxattr = NXPWIFI_EDMAC_MAX - 1,
 	}
 };
 

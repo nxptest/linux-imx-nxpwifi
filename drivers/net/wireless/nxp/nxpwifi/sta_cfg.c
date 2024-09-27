@@ -1368,3 +1368,10 @@ int nxpwifi_set_antenna(struct nxpwifi_private *priv, u16 action,
 				       0, ant_cfg,
 				       cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_edmac(struct nxpwifi_private *priv, u16 action, int cmd_type,
+		      struct nxpwifi_ds_ed_mac_cfg *edmac_cfg)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_EDMAC_CFG, action, 0, edmac_cfg,
+				cmd_type == NXPWIFI_SYNC_CMD);
+}

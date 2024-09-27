@@ -413,6 +413,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_HS_WAKEUP_REASON                  0x0116
 #define HOST_CMD_MC_POLICY                         0x0121
 #define HOST_CMD_FW_DUMP_EVENT                     0x0125
+#define HOST_CMD_EDMAC_CFG                         0x0130
 #define HOST_CMD_SDIO_SP_RX_AGGR_CFG               0x0223
 #define HOST_CMD_STA_CONFIGURE                     0x023f
 #define HOST_CMD_VDLL                              0x0240
@@ -2300,6 +2301,19 @@ struct host_cmd_ds_csi_cfg {
 	struct nxpwifi_csi_filter csi_filter[CSI_FILTER_MAX];
 } __packed;
 
+/* edmac configuration: HostCmd_DS_EDMAC_CFG*/
+struct host_cmd_ds_edmac_cfg {
+	/** EU adaptivity for 2.4ghz band */
+	u16 ed_ctrl_2g;
+	/** Energy detect threshold offset for 2.4ghz */
+	s16 ed_offset_2g;
+	/** EU adaptivity for 5ghz band */
+	u16 ed_ctrl_5g;
+	/** Energy detect threshold offset for 5ghz */
+	s16 ed_offset_5g;
+	u32 ed_bitmap_txq_lock;
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2376,6 +2390,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_802_11_sleep_period sleep_pd;
 		struct host_cmd_ds_independent_reset_cfg ind_rst_cfg;
 		struct host_cmd_ds_csi_cfg csi_params;
+		struct host_cmd_ds_edmac_cfg ed_mac_cfg;
 	} params;
 } __packed;
 

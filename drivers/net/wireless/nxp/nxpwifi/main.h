@@ -1495,4 +1495,6 @@ int nxpwifi_set_channel_switch(struct nxpwifi_private *priv, u16 action,
 int nxpwifi_set_antenna(struct nxpwifi_private *priv, u16 action,
 			int cmd_type,
 				struct nxpwifi_ds_ant_cfg *ant_cfg);
+int nxpwifi_set_edmac(struct nxpwifi_private *priv, u16 action, int cmd_type,
+		      struct nxpwifi_ds_ed_mac_cfg *edmac_cfg);
 #endif /* !_NXPWIFI_MAIN_H_ */

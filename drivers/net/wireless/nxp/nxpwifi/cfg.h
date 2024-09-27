@@ -604,6 +604,19 @@ struct nxpwifi_ds_ant_cfg {
 	u16 evaluate_time;
 };
 
+/** EDMAC configuration parameters */
+struct nxpwifi_ds_ed_mac_cfg {
+	/** EU adaptivity for 2.4ghz band */
+	u16 ed_ctrl_2g;
+	/** Energy detect threshold offset for 2.4ghz */
+	s16 ed_offset_2g;
+	/** EU adaptivity for 5ghz band */
+	u16 ed_ctrl_5g;
+	/** Energy detect threshold offset for 5ghz */
+	s16 ed_offset_5g;
+	u32 ed_bitmap_txq_lock;
+};
+
 #define NXPWIFI_NUM_OF_CMD_BUFFER	50
 #define NXPWIFI_SIZE_OF_CMD_BUFFER	2048
 
