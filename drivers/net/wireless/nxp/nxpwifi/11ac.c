@@ -260,9 +260,9 @@ int nxpwifi_cmd_11ac_cfg(struct nxpwifi_private *priv,
 	vhtcfg->action = cpu_to_le16(cmd_action);
 	vhtcfg->band_config = cfg->band_config;
 	vhtcfg->misc_config = cfg->misc_config;
-	vhtcfg->cap_info = cpu_to_le32(cfg->cap_info);
-	vhtcfg->mcs_tx_set = cpu_to_le32(cfg->mcs_tx_set);
-	vhtcfg->mcs_rx_set = cpu_to_le32(cfg->mcs_rx_set);
+	memcpy(&vhtcfg->cap_info, &cfg->cap_info, sizeof(u32));
+	memcpy(&vhtcfg->mcs_tx_set, &cfg->mcs_tx_set, sizeof(u32));
+	memcpy(&vhtcfg->mcs_rx_set, &cfg->mcs_rx_set, sizeof(u32));
 
 	return 0;
 }

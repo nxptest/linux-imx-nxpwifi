@@ -2564,6 +2564,26 @@ nxpwifi_cmd_sta_11ac_cfg(struct nxpwifi_private *priv,
 	return nxpwifi_cmd_11ac_cfg(priv, cmd, cmd_action, data_buf);
 }
 
+static int nxpwifi_ret_11ac_cfg(struct nxpwifi_private *priv,
+				struct host_cmd_ds_command *resp,
+				u16 cmdresp_no, void *data_buf)
+{
+	struct nxpwifi_11ac_vht_cfg *cfg = NULL;
+	struct host_cmd_11ac_vht_cfg *vhtcfg = &resp->params.vht_cfg;
+
+	if (data_buf && (le16_to_cpu(vhtcfg->action) == HOST_ACT_GEN_GET)) {
+		cfg = (struct nxpwifi_11ac_vht_cfg *)data_buf;
+		cfg->band_config = vhtcfg->band_config;
+		cfg->misc_config = vhtcfg->misc_config;
+
+		memcpy(&cfg->cap_info, &vhtcfg->cap_info, sizeof(u32));
+		memcpy(&cfg->mcs_tx_set, &vhtcfg->mcs_tx_set, sizeof(u32));
+		memcpy(&cfg->mcs_rx_set, &vhtcfg->mcs_rx_set, sizeof(u32));
+	}
+
+	return 0;
+}
+
 static int
 nxpwifi_cmd_sta_hs_wakeup_reason(struct nxpwifi_private *priv,
 				 struct host_cmd_ds_command *cmd,
@@ -3327,7 +3347,7 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	.cmd_resp = NULL},
 	{.cmd_no = HOST_CMD_11AC_CFG,
 	.prepare_cmd = nxpwifi_cmd_sta_11ac_cfg,
-	.cmd_resp = NULL},
+	.cmd_resp = nxpwifi_ret_11ac_cfg},
 	{.cmd_no = HOST_CMD_HS_WAKEUP_REASON,
 	.prepare_cmd = nxpwifi_cmd_sta_hs_wakeup_reason,
 	.cmd_resp = nxpwifi_ret_sta_hs_wakeup_reason},

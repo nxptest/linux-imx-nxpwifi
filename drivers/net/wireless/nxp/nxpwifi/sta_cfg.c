@@ -1375,3 +1375,43 @@ int nxpwifi_set_edmac(struct nxpwifi_private *priv, u16 action, int cmd_type,
 	return nxpwifi_send_cmd(priv, HOST_CMD_EDMAC_CFG, action, 0, edmac_cfg,
 				cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_vht(struct nxpwifi_private *priv, u16 action, int cmd_type,
+		    struct nxpwifi_11ac_vht_cfg *vht_cfg)
+{
+	struct nxpwifi_adapter *adapter = priv->adapter;
+
+	if ((vht_cfg->misc_config & 0x3) == 2) {
+		if (action == HOST_ACT_GEN_SET) {
+			if (vht_cfg->band_config == 3) {
+				adapter->usr_dot_11ac_dev_cap_a =
+					vht_cfg->cap_info;
+				adapter->usr_dot_11ac_dev_cap_bg =
+					vht_cfg->cap_info;
+			} else if (vht_cfg->band_config == 2) {
+				adapter->usr_dot_11ac_dev_cap_a =
+					vht_cfg->cap_info;
+			} else {
+				adapter->usr_dot_11ac_dev_cap_bg =
+					vht_cfg->cap_info;
+			}
+		} else {
+			if (vht_cfg->band_config == 3) {
+				vht_cfg->cap_info =
+					adapter->usr_dot_11ac_dev_cap_a;
+			} else if (vht_cfg->band_config == 2) {
+				vht_cfg->cap_info =
+					adapter->usr_dot_11ac_dev_cap_a;
+			} else {
+				vht_cfg->cap_info =
+					adapter->usr_dot_11ac_dev_cap_bg;
+			}
+		}
+
+		return 0;
+	} else {
+		return nxpwifi_send_cmd(priv, HOST_CMD_11AC_CFG, action, 0,
+					vht_cfg, cmd_type == NXPWIFI_SYNC_CMD);
+	}
+}
+

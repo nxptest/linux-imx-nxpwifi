@@ -952,6 +952,34 @@ struct nxpwifi_ds_csi_cfg {
 	struct nxpwifi_csi_filter csi_filter[CSI_FILTER_MAX];
 } __packed;
 
+struct nxpwifi_ds_11ac_vht_cfg {
+	u32 band;
+	u32 txrx;
+	u32 bwcfg;
+	u32 vht_cap_info;
+	u32 vht_tx_mcs;
+	u32 vht_rx_mcs;
+	u16 vht_rx_max_rate;
+	u16 vht_tx_max_rate;
+	bool skip_usr_11ac_mcs_cfg;
+};
+
+struct nxpwifi_ds_11ac_opermode_cfg {
+	u8 bw;
+	u8 nss;
+};
+
+#define NXPWIFI_NUM_MCS_SUPP 20
+
+struct nxpwifi_ds_11ac_cfg {
+	u32 sub_command;
+	union {
+		struct nxpwifi_ds_11ac_vht_cfg vht_cfg;
+		u8 supported_mcs_set[NXPWIFI_NUM_MCS_SUPP];
+		struct nxpwifi_ds_11ac_opermode_cfg opermode_cfg;
+	} param;
+};
+
 #define NXPWIFI_MAX_NUM_PKTS    9
 #define NXPWIFI_DEF_NUM_PKTS    3
 

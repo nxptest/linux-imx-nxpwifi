@@ -34,6 +34,16 @@ nla_policy nxpwifi_edmac_policy[NXPWIFI_EDMAC_MAX + 1] = {
 	[NXPWIFI_EDMAC_TXQ_LOCK] = { .type = NLA_U32 },
 };
 
+static const struct
+nla_policy nxpwifi_vht_policy[NXPWIFI_VHT_MAX + 1] = {
+	[NXPWIFI_VHT_BAND] = { .type = NLA_U32 },
+	[NXPWIFI_VHT_TXRX] = { .type = NLA_U32 },
+	[NXPWIFI_VHT_BW] = { .type = NLA_U32 },
+	[NXPWIFI_VHT_CAP] = { .type = NLA_U32 },
+	[NXPWIFI_VHT_TXMCS] = { .type = NLA_U32 },
+	[NXPWIFI_VHT_RXMCS] = { .type = NLA_U32 }
+};
+
 static int nxpwifi_vendor_cmd_sleeppd(struct wiphy *wiphy,
 				      struct wireless_dev *wdev,
 				      const void *data,
@@ -650,6 +660,153 @@ static int nxpwifi_vendor_edmac_cfg(struct wiphy *wiphy,
 	return ret;
 }
 
+static int nxpwifi_vendor_vht_cfg(struct wiphy *wiphy,
+				  struct wireless_dev *wdev, const void *data,
+				  int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv = NULL;
+	struct nlattr *tb_vendor[NXPWIFI_VHT_MAX + 1];
+	struct nxpwifi_11ac_vht_cfg *vht_cfg;
+	int ret = 0;
+	struct sk_buff *resp;
+	u32 txrx, bw;
+
+	vht_cfg = kzalloc(sizeof(*vht_cfg), GFP_KERNEL);
+
+	if (!vht_cfg)
+		return -ENOMEM;
+
+	nla_parse(tb_vendor, NXPWIFI_VHT_MAX, (struct nlattr *)data, data_len,
+		  nxpwifi_vht_policy, NULL);
+
+	if (!tb_vendor[NXPWIFI_VHT_BAND]) {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Could not find NXPWIFI_VHT_BAND attr!\n");
+		ret = -EINVAL;
+		goto done;
+	}
+
+	vht_cfg->band_config = 0x3 &
+			       *(u8 *)nla_data(tb_vendor[NXPWIFI_VHT_BAND]);
+
+	if (!tb_vendor[NXPWIFI_VHT_TXRX]) {
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "Could not find NXPWIFI_VHT_TXRX attr!\n");
+		ret = -EINVAL;
+		goto done;
+	}
+
+	vht_cfg->misc_config |= 0x3 &
+				*(u8 *)nla_data(tb_vendor[NXPWIFI_VHT_TXRX]);
+
+	if (vht_cfg->misc_config == 0) {
+		ret = -EINVAL;
+		goto done;
+	} else if ((vht_cfg->misc_config == 1) || (vht_cfg->misc_config == 2)) {
+		priv = nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+		nxpwifi_dbg(priv->adapter, ERROR, "sta mode\n");
+	} else {
+		priv = nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_UAP);
+	}
+
+	if (!tb_vendor[NXPWIFI_VHT_BW]) {
+		nxpwifi_dbg(priv->adapter, INFO,
+			    "Could not find NXPWIFI_VHT_BW attr! It's a get command.\n");
+
+		ret = nxpwifi_set_vht(priv, HOST_ACT_GEN_GET, NXPWIFI_SYNC_CMD,
+				      vht_cfg);
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, 32);
+
+		if (!resp) {
+			ret = -ENOMEM;
+			goto done;
+		}
+
+		if (nla_put_u32(resp, NXPWIFI_VHT_BAND, vht_cfg->band_config)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_BAND attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+		txrx = vht_cfg->misc_config & 0x3;
+
+		if (nla_put_u32(resp, NXPWIFI_VHT_TXRX, txrx)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_TXRX attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+
+		bw = (vht_cfg->misc_config & 0x4) << 2;
+
+		if (nla_put_u32(resp, NXPWIFI_VHT_BW, bw)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_BW attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+
+		if (nla_put_u32(resp, NXPWIFI_VHT_CAP, vht_cfg->cap_info)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_CAP attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+
+		if (nla_put_u32(resp, NXPWIFI_VHT_TXMCS, vht_cfg->mcs_tx_set)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_TXMCS attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+		if (nla_put_u32(resp, NXPWIFI_VHT_RXMCS, vht_cfg->mcs_rx_set)) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "put NXPWIFI_VHT_RXMCS attribute error\n");
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+		ret = cfg80211_vendor_cmd_reply(resp);
+	} else {
+		vht_cfg->misc_config |=
+			0x4 & (*(u8 *)nla_data(tb_vendor[NXPWIFI_VHT_BW]) << 2);
+
+		if (!tb_vendor[NXPWIFI_VHT_CAP]) {
+			nxpwifi_dbg(priv->adapter, ERROR,
+				    "Could not find NXPWIFI_VHT_CAP attr!\n");
+			ret = -EINVAL;
+			goto done;
+		}
+
+		memcpy(&vht_cfg->cap_info, nla_data(tb_vendor[NXPWIFI_VHT_CAP]),
+		       sizeof(u32));
+
+		if (tb_vendor[NXPWIFI_VHT_TXMCS])
+			memcpy(&vht_cfg->mcs_tx_set,
+			       nla_data(tb_vendor[NXPWIFI_VHT_TXMCS]),
+			       sizeof(u32));
+
+		if (tb_vendor[NXPWIFI_VHT_RXMCS])
+			memcpy(&vht_cfg->mcs_rx_set,
+			       nla_data(tb_vendor[NXPWIFI_VHT_RXMCS]),
+			       sizeof(u32));
+
+		ret = nxpwifi_set_vht(priv, HOST_ACT_GEN_SET, NXPWIFI_SYNC_CMD,
+				      vht_cfg);
+	}
+done:
+	kfree(vht_cfg);
+
+	return ret;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -732,6 +889,16 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		.doit = nxpwifi_vendor_edmac_cfg,
 		.policy = nxpwifi_edmac_policy,
 		.maxattr = NXPWIFI_EDMAC_MAX - 1,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_VHT_CFG,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_vht_cfg,
+		.policy = nxpwifi_vht_policy,
+		.maxattr = NXPWIFI_VHT_MAX - 1,
 	}
 };
 
