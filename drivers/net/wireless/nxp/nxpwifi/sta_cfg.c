@@ -280,6 +280,10 @@ int nxpwifi_bss_start(struct nxpwifi_private *priv, struct cfg80211_bss *bss,
 	if (nxpwifi_band_to_radio_type(bss_desc->bss_band) ==
 				       HOST_SCAN_RADIO_TYPE_BG) {
 		config_bands = BAND_B | BAND_G | BAND_GN;
+		if (adapter->fw_bands & BAND_GAC)
+			config_bands |= BAND_GAC;
+		if (adapter->fw_bands & BAND_GAX)
+			config_bands |= BAND_GAX;
 	} else {
 		config_bands = BAND_A | BAND_AN;
 		if (adapter->fw_bands & BAND_AAC)
