@@ -1415,3 +1415,10 @@ int nxpwifi_set_vht(struct nxpwifi_private *priv, u16 action, int cmd_type,
 	}
 }
 
+int nxpwifi_set_ch_trpc(struct nxpwifi_private *priv, int cmd_type,
+			struct nxpwifi_ds_chan_trpc_cfg *ch_trpc)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_CHAN_TRPC_CONFIG,
+				ch_trpc->action, 0, ch_trpc,
+				cmd_type == NXPWIFI_SYNC_CMD);
+}

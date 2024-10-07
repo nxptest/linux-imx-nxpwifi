@@ -807,6 +807,52 @@ done:
 	return ret;
 }
 
+static int nxpwifi_vendor_txpower_limit(struct wiphy *wiphy,
+					struct wireless_dev *wdev,
+					const void *data, int data_len)
+{
+	struct nxpwifi_adapter *adapter =
+		(struct nxpwifi_adapter *)(*(unsigned long *)wiphy_priv(wiphy));
+	struct nxpwifi_private *priv =
+		nxpwifi_get_priv(adapter, NXPWIFI_BSS_ROLE_STA);
+	int ret = 0;
+	struct sk_buff *resp;
+	struct nxpwifi_ds_chan_trpc_cfg *ch_trpc;
+
+	ch_trpc = kzalloc(sizeof(*ch_trpc) + data_len, GFP_KERNEL);
+
+	if (!ch_trpc)
+		return -ENOMEM;
+
+	memcpy((void *)&ch_trpc->action, data, data_len);
+	ch_trpc->len = data_len;
+
+	ret = nxpwifi_set_ch_trpc(priv, NXPWIFI_SYNC_CMD, ch_trpc);
+
+	if (ch_trpc->action == HOST_ACT_GEN_GET) {
+		resp = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, ch_trpc->len + NLA_HDRLEN);
+
+		if (!resp) {
+			ret = -ENOMEM;
+			goto done;
+		}
+
+		if (nla_put(resp, NXPWIFI_ATTR_TXPWR_LIMIT, ch_trpc->len,
+			    &ch_trpc->action)) {
+			kfree_skb(resp);
+			ret = -ENOBUFS;
+			goto done;
+		}
+
+		ret = cfg80211_vendor_cmd_reply(resp);
+	}
+
+done:
+	kfree(ch_trpc);
+
+	return ret;
+}
+
 static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 	{
 		.info = {
@@ -899,6 +945,15 @@ static const struct wiphy_vendor_command nxpwifi_vendor_commands[] = {
 		.doit = nxpwifi_vendor_vht_cfg,
 		.policy = nxpwifi_vht_policy,
 		.maxattr = NXPWIFI_VHT_MAX - 1,
+	},
+	{
+		.info = {
+			.vendor_id = NXP_OUI,
+			.subcmd = NXPWIFI_VENDOR_CMD_TXPOWER_LIMIT,
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_RUNNING,
+		.doit = nxpwifi_vendor_txpower_limit,
+		.policy = VENDOR_CMD_RAW_DATA,
 	}
 };
 

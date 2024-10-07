@@ -3197,6 +3197,72 @@ static int nxpwifi_ret_edmac_cfg(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int nxpwifi_cmd_chan_trpc_cfg(struct nxpwifi_private *priv,
+				     struct host_cmd_ds_command *cmd,
+				     u16 cmd_no, void *data_buf, u16 cmd_action,
+				     u32 cmd_type)
+{
+	struct host_cmd_chan_trpc_cfg *chan_trpc_cfg = &cmd->params.ch_trpc_cfg;
+	struct nxpwifi_ds_chan_trpc_cfg *usr_chan_trpc_cfg =
+		(struct nxpwifi_ds_chan_trpc_cfg *)data_buf;
+	struct nxpwifi_ie_types_header *tlv;
+	int len = 0;
+
+	cmd->command = cpu_to_le16(cmd_no);
+	cmd->size = cpu_to_le16(S_DS_GEN);
+
+	memcpy((void *)chan_trpc_cfg, (void *)&usr_chan_trpc_cfg->action,
+	       usr_chan_trpc_cfg->len);
+	cmd->size += cpu_to_le16(usr_chan_trpc_cfg->len);
+
+	nxpwifi_dbg(priv->adapter, ERROR, "action %02x subband %02x",
+		    chan_trpc_cfg->action, chan_trpc_cfg->subband);
+	tlv = (struct nxpwifi_ie_types_header *)chan_trpc_cfg->tlvbuffer;
+
+	while (tlv->type == 0x0189) {
+		len += sizeof(*tlv);
+		len += tlv->len;
+		tlv = (struct nxpwifi_ie_types_header *)((u8 *)tlv +
+							 sizeof(*tlv) +
+							 tlv->len);
+	}
+
+	nxpwifi_dbg(priv->adapter, ERROR, "set tlv len %d\n", len);
+
+	return 0;
+}
+
+static int nxpwifi_ret_chan_trpc_cfg(struct nxpwifi_private *priv,
+				     struct host_cmd_ds_command *resp,
+				     u16 cmdresp_no, void *data_buf)
+{
+	struct host_cmd_chan_trpc_cfg *chan_trpc_cfg =
+		&resp->params.ch_trpc_cfg;
+	struct nxpwifi_ds_chan_trpc_cfg *usr_chan_trpc_cfg =
+		(struct nxpwifi_ds_chan_trpc_cfg *)data_buf;
+	struct nxpwifi_ie_types_header *tlv;
+	int len;
+
+	if (chan_trpc_cfg->action == HOST_ACT_GEN_GET) {
+		usr_chan_trpc_cfg->len = resp->size - S_DS_GEN;
+		memcpy((void *)&usr_chan_trpc_cfg->action,
+		       (void *)chan_trpc_cfg, usr_chan_trpc_cfg->len);
+		tlv = (struct nxpwifi_ie_types_header
+			       *)(&usr_chan_trpc_cfg->action +
+				  sizeof(usr_chan_trpc_cfg->subband));
+		while (tlv->type == 0x0189) {
+			len += sizeof(*tlv);
+			len += tlv->len;
+			tlv = (struct nxpwifi_ie_types_header *)((u8 *)tlv +
+								 sizeof(*tlv) +
+								 tlv->len);
+		}
+		nxpwifi_dbg(priv->adapter, ERROR, "Get tlv len %d\n", len);
+	}
+
+	return 0;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3389,7 +3455,10 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	.cmd_resp = NULL},
 	{.cmd_no = HOST_CMD_EDMAC_CFG,
 	.prepare_cmd = nxpwifi_cmd_edmac_cfg,
-	.cmd_resp = nxpwifi_ret_edmac_cfg}
+	.cmd_resp = nxpwifi_ret_edmac_cfg},
+	{.cmd_no = HOST_CMD_CHAN_TRPC_CONFIG,
+	.prepare_cmd = nxpwifi_cmd_chan_trpc_cfg,
+	.cmd_resp = nxpwifi_ret_chan_trpc_cfg}
 };
 
 /* This function prepares the commands before sending them to the firmware.

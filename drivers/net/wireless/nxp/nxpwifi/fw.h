@@ -191,6 +191,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define TLV_TYPE_AUTO_DS_PARAM      (PROPRIETARY_TLV_BASE_ID + 113)
 #define TLV_TYPE_PS_PARAM           (PROPRIETARY_TLV_BASE_ID + 114)
 #define TLV_TYPE_UAP_PS_AO_TIMER    (PROPRIETARY_TLV_BASE_ID + 123)
+#define TLV_TYPE_CHANNEL_TRPC       (PROPRIETARY_TLV_BASE_ID + 137)
 #define TLV_TYPE_PWK_CIPHER         (PROPRIETARY_TLV_BASE_ID + 145)
 #define TLV_TYPE_GWK_CIPHER         (PROPRIETARY_TLV_BASE_ID + 146)
 #define TLV_TYPE_TX_PAUSE           (PROPRIETARY_TLV_BASE_ID + 148)
@@ -404,6 +405,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_CAU_REG_ACCESS                    0x00ed
 #define HOST_CMD_SET_BSS_MODE                      0x00f7
 #define HOST_CMD_PCIE_DESC_DETAILS                 0x00fa
+#define HOST_CMD_CHAN_TRPC_CONFIG                  0x00fb
 #define HOST_CMD_802_11_SCAN_EXT                   0x0107
 #define HOST_CMD_COALESCE_CFG                      0x010a
 #define HOST_CMD_MGMT_FRAME_REG                    0x010c
@@ -2314,6 +2316,12 @@ struct host_cmd_ds_edmac_cfg {
 	u32 ed_bitmap_txq_lock;
 } __packed;
 
+struct host_cmd_chan_trpc_cfg {
+	u16 action;
+	u16 subband;
+	u8 tlvbuffer[];
+} __packed;
+
 struct host_cmd_ds_command {
 	__le16 command;
 	__le16 size;
@@ -2391,6 +2399,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_independent_reset_cfg ind_rst_cfg;
 		struct host_cmd_ds_csi_cfg csi_params;
 		struct host_cmd_ds_edmac_cfg ed_mac_cfg;
+		struct host_cmd_chan_trpc_cfg ch_trpc_cfg;
 	} params;
 } __packed;
 

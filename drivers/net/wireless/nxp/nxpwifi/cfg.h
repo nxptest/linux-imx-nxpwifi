@@ -980,6 +980,13 @@ struct nxpwifi_ds_11ac_cfg {
 	} param;
 };
 
+struct nxpwifi_ds_chan_trpc_cfg {
+	int len;
+	u16 action;
+	u16 subband;
+	u8 tlvbuffer[];
+} __packed;
+
 #define NXPWIFI_MAX_NUM_PKTS    9
 #define NXPWIFI_DEF_NUM_PKTS    3
 
