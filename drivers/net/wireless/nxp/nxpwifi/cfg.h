@@ -13,7 +13,8 @@
 #include <linux/ieee80211.h>
 #include <uapi/linux/if_arp.h>
 #include <net/cfg80211.h>
-#include <net/lib80211.h>
+
+#define NUM_WEP_KEYS                 4
 
 #define NXPWIFI_BSS_COEX_COUNT	     2
 #define NXPWIFI_MAX_BSS_NUM         (2)
