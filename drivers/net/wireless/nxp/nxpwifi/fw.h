@@ -377,6 +377,7 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define HOST_CMD_802_11_SUBSCRIBE_EVENT            0x0075
 #define HOST_CMD_802_11_TX_RATE_QUERY              0x007f
 #define HOST_CMD_MEM_ACCESS                        0x0086
+#define HOST_CMD_MFG_COMMAND                       0x0089
 #define HOST_CMD_CFG_DATA                          0x008f
 #define HOST_CMD_VERSION_EXT                       0x0097
 #define HOST_CMD_MEF_CFG                           0x009a
@@ -2400,6 +2401,7 @@ struct host_cmd_ds_command {
 		struct host_cmd_ds_csi_cfg csi_params;
 		struct host_cmd_ds_edmac_cfg ed_mac_cfg;
 		struct host_cmd_chan_trpc_cfg ch_trpc_cfg;
+		struct nxpwifi_mfg_cmd_generic_cfg mfg_generic_cfg;
 	} params;
 } __packed;
 

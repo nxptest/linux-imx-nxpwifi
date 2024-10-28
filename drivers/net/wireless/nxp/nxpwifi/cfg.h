@@ -987,6 +987,33 @@ struct nxpwifi_ds_chan_trpc_cfg {
 	u8 tlvbuffer[];
 } __packed;
 
+struct  nxpwifi_mfg_cmd_generic_cfg {
+	u32 mfg_cmd;
+	u16 action;
+	u16 device_id;
+	u32 error;
+	u32 data1;
+	u32 data2;
+	u32 data3;
+} __packed;
+
+#define NXPWIFI_MFG_CMD_SET_TEST_MODE 1
+#define NXPWIFI_MFG_CMD_UNSET_TEST_MODE 0
+#define NXPWIFI_MFG_CMD_TX_ANT 0x1004
+#define NXPWIFI_MFG_CMD_RX_ANT 0x1005
+#define NXPWIFI_MFG_CMD_TX_CONT 0x1009
+#define NXPWIFI_MFG_CMD_RF_CHAN 0x100A
+#define NXPWIFI_MFG_CMD_CLR_RX_ERR 0x1010
+#define NXPWIFI_MFG_CMD_TX_FRAME 0x1021
+#define NXPWIFI_MFG_CMD_RFPWR 0x1033
+#define NXPWIFI_MFG_CMD_RF_BAND_AG 0x1034
+#define NXPWIFI_MFG_CMD_RF_CHANNELBW 0x1044
+#define NXPWIFI_MFG_CMD_RADIO_MODE_CFG 0x1211
+#define NXPWIFI_MFG_CMD_CONFIG_MAC_HE_TB_TX 0x110A
+#define NXPWIFI_MFG_CMD_CONFIG_TRIGGER_FRAME 0x110C
+#define NXPWIFI_MFG_CMD_OTP_MAC_ADD 0x108C
+#define NXPWIFI_MFG_CMD_OTP_CAL_DATA 0x121A
+
 #define NXPWIFI_MAX_NUM_PKTS    9
 #define NXPWIFI_DEF_NUM_PKTS    3
 

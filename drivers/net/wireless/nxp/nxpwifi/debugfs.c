@@ -948,6 +948,73 @@ nxpwifi_fake_radar_detect_write(struct file *file,
 	return count;
 }
 
+static ssize_t nxpwifi_rf_test_read(struct file *file, char __user *ubuf,
+					   size_t count, loff_t *ppos)
+{
+	struct nxpwifi_private *priv = file->private_data;
+	unsigned long addr = get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *)addr;
+	bool rf_test_mode;
+	int pos;
+
+	rf_test_mode = false;
+
+	pos = snprintf(buf, PAGE_SIZE, "rf_test_mode %d\n",
+		       priv->adapter->rf_test_mode);
+	pos += scnprintf(buf + pos, PAGE_SIZE - pos, "cont tx\n");
+	return simple_read_from_buffer(ubuf, count, ppos, buf, pos);
+}
+
+static ssize_t nxpwifi_rf_test_write(struct file *file,
+					    const char __user *ubuf,
+					    size_t count, loff_t *ppos)
+{
+	bool rf_test_mode;
+	struct nxpwifi_private *priv = file->private_data;
+	char *line = NULL;
+	char *buf;
+	int ret;
+	struct nxpwifi_mfg_cmd_generic_cfg rftest_cfg;
+
+	buf = memdup_user_nul(ubuf,
+				      min(count, (size_t)(PAGE_SIZE - 1)));
+
+	if (IS_ERR(buf))
+		return PTR_ERR(buf);
+
+	line = buf;
+
+	if (!strncmp(buf, "rf_test_mode", strlen("rf_test_mode"))) {
+		line += strlen("rf_test_mode") + 1;
+		if ((ret = kstrtobool(line, &rf_test_mode)) < 0 ) {
+			kfree(buf);
+			return ret;
+		}
+
+		if (priv->adapter->rf_test_mode != rf_test_mode) {
+			priv->adapter->rf_test_mode = rf_test_mode;
+
+			if (priv->adapter->rf_test_mode) {
+				nxpwifi_dbg(priv->adapter, MSG,
+					    "RF test mode ON\n");
+				rftest_cfg.mfg_cmd =
+					NXPWIFI_MFG_CMD_SET_TEST_MODE;
+				rftest_cfg.action = HOST_ACT_GEN_SET;
+			} else {
+				nxpwifi_dbg(priv->adapter, MSG,
+					    "RF test mode OFF\n");
+				rftest_cfg.mfg_cmd =
+					NXPWIFI_MFG_CMD_UNSET_TEST_MODE;
+				rftest_cfg.action = HOST_ACT_GEN_SET;
+			}
+			nxpwifi_set_rf_test(priv, NXPWIFI_SYNC_CMD,
+					    &rftest_cfg);
+		}
+	}
+
+	return count;
+}
+
 #define NXPWIFI_DFS_ADD_FILE(name) debugfs_create_file(#name, 0644,     \
 				   priv->dfs_dev_dir, priv,             \
 				   &nxpwifi_dfs_##name##_fops)
@@ -984,6 +1051,7 @@ NXPWIFI_DFS_FILE_OPS(timeshare_coex);
 NXPWIFI_DFS_FILE_WRITE_OPS(reset);
 NXPWIFI_DFS_FILE_WRITE_OPS(fake_radar_detect);
 NXPWIFI_DFS_FILE_OPS(verext);
+NXPWIFI_DFS_FILE_OPS(rf_test);
 
 /* This function creates the debug FS directory structure and the files.
  */
@@ -1010,6 +1078,7 @@ nxpwifi_dev_debugfs_init(struct nxpwifi_private *priv)
 	NXPWIFI_DFS_ADD_FILE(reset);
 	NXPWIFI_DFS_ADD_FILE(fake_radar_detect);
 	NXPWIFI_DFS_ADD_FILE(verext);
+	NXPWIFI_DFS_ADD_FILE(rf_test);
 }
 
 /* This function removes the debug FS directory structure and the files.

@@ -1422,3 +1422,10 @@ int nxpwifi_set_ch_trpc(struct nxpwifi_private *priv, int cmd_type,
 				ch_trpc->action, 0, ch_trpc,
 				cmd_type == NXPWIFI_SYNC_CMD);
 }
+
+int nxpwifi_set_rf_test(struct nxpwifi_private *priv, int cmd_type,
+			struct nxpwifi_mfg_cmd_generic_cfg *rftest_cfg)
+{
+	return nxpwifi_send_cmd(priv, HOST_CMD_MFG_COMMAND, rftest_cfg->action,
+				0, rftest_cfg, cmd_type == NXPWIFI_SYNC_CMD);
+}

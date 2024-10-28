@@ -973,6 +973,7 @@ struct nxpwifi_adapter {
 	bool ignore_btcoex_events;
 	struct vdll_dnld_ctrl vdll_ctrl;
 	u64 roc_cookie_counter;
+	bool rf_test_mode;
 };
 
 void nxpwifi_process_tx_queue(struct nxpwifi_adapter *adapter);
@@ -1501,4 +1502,6 @@ int nxpwifi_set_vht(struct nxpwifi_private *priv, u16 action, int cmd_type,
 		    struct nxpwifi_11ac_vht_cfg *vht_cfg);
 int nxpwifi_set_ch_trpc(struct nxpwifi_private *priv, int cmd_type,
 			struct nxpwifi_ds_chan_trpc_cfg *ch_trpc);
+int nxpwifi_set_rf_test(struct nxpwifi_private *priv, int cmd_type,
+			struct nxpwifi_mfg_cmd_generic_cfg *rftest_cfg);
 #endif /* !_NXPWIFI_MAIN_H_ */

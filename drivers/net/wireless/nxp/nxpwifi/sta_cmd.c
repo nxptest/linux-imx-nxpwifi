@@ -3263,6 +3263,136 @@ static int nxpwifi_ret_chan_trpc_cfg(struct nxpwifi_private *priv,
 	return 0;
 }
 
+static int nxpwifi_mfg_cmd(struct nxpwifi_private *priv,
+			   struct host_cmd_ds_command *cmd, u16 cmd_no,
+			   void *data_buf, u16 cmd_action, u32 cmd_type)
+{
+	struct nxpwifi_mfg_cmd_generic_cfg *mcmd =
+		(struct nxpwifi_mfg_cmd_generic_cfg *)&cmd->params
+			.mfg_generic_cfg;
+	struct nxpwifi_mfg_cmd_generic_cfg *cfg =
+		(struct nxpwifi_mfg_cmd_generic_cfg *)data_buf;
+	int ret = 0;
+
+	switch (cfg->mfg_cmd) {
+#if 0
+	case NXPWIFIMFG_CMD_TX_CONT:
+		ret = wlan_cmd_mfg_tx_cont(pmpriv, cmd, action, pdata_buf);
+		goto cmd_mfg_done;
+	case NXPWIFIMFG_CMD_TX_FRAME:
+		ret = wlan_cmd_mfg_tx_frame(pmpriv, cmd, action, pdata_buf);
+		goto cmd_mfg_done;
+	case NXPWIFIMFG_CMD_CONFIG_MAC_HE_TB_TX:
+		ret = wlan_cmd_mfg_he_tb_tx(pmpriv, cmd, action, pdata_buf);
+		goto cmd_mfg_done;
+	case NXPWIFIMFG_CMD_CONFIG_TRIGGER_FRAME:
+		ret = wlan_cmd_mfg_config_trigger_frame(pmpriv, cmd, action,
+							pdata_buf);
+		goto cmd_mfg_done;
+	case NXPWIFIMFG_CMD_OTP_MAC_ADD:
+		ret = wlan_cmd_mfg_otp_rw(pmpriv, cmd, action, pdata_buf);
+		goto cmd_mfg_done;
+	case NXPWIFI_MFG_CMD_OTP_CAL_DATA:
+		ret = wlan_cmd_mfg_otp_cal_data_rw(pmpriv, cmd, action,
+						   pdata_buf);
+		goto cmd_mfg_done;
+#endif
+	case NXPWIFI_MFG_CMD_SET_TEST_MODE:
+	case NXPWIFI_MFG_CMD_UNSET_TEST_MODE:
+	case NXPWIFI_MFG_CMD_TX_ANT:
+	case NXPWIFI_MFG_CMD_RX_ANT:
+	case NXPWIFI_MFG_CMD_RF_CHAN:
+	case NXPWIFI_MFG_CMD_CLR_RX_ERR:
+	case NXPWIFI_MFG_CMD_RF_BAND_AG:
+	case NXPWIFI_MFG_CMD_RF_CHANNELBW:
+	case NXPWIFI_MFG_CMD_RADIO_MODE_CFG:
+	case NXPWIFI_MFG_CMD_RFPWR:
+		break;
+	default:
+		ret = -EINVAL;
+		goto done;
+	}
+
+	cmd->command = cpu_to_le16(cmd_no);
+	cmd->size = cpu_to_le16(sizeof(*mcmd) + S_DS_GEN);
+
+	mcmd->mfg_cmd = cpu_to_le32(cfg->mfg_cmd);
+	mcmd->action = cpu_to_le16(cmd_action);
+	if (cmd_action == HOST_ACT_GEN_SET) {
+		mcmd->data1 = cpu_to_le32(cfg->data1);
+		mcmd->data2 = cpu_to_le32(cfg->data2);
+		mcmd->data3 = cpu_to_le32(cfg->data3);
+	}
+done:
+	return ret;
+}
+
+static int nxpwifi_ret_mfg_cmd(struct nxpwifi_private *priv,
+			       struct host_cmd_ds_command *resp, u16 cmdresp_no,
+			       void *data_buf)
+{
+	struct nxpwifi_mfg_cmd_generic_cfg *mcmd =
+		(struct nxpwifi_mfg_cmd_generic_cfg *)&resp->params.mfg_generic_cfg;
+	struct nxpwifi_mfg_cmd_generic_cfg *cfg = NULL;
+	int ret = 0;
+
+	if (!data_buf)
+		return -ENOBUFS;
+
+	switch (le32_to_cpu(mcmd->mfg_cmd)) {
+#if 0
+	case NXPWIFI_MFG_CMD_TX_CONT:
+		ret = wlan_ret_mfg_tx_cont(pmpriv, resp, pioctl_buf);
+		goto done;
+	case NXPWIFI_MFG_CMD_TX_FRAME:
+		ret = wlan_ret_mfg_tx_frame(pmpriv, resp, pioctl_buf);
+		goto done;
+	case NXPWIFI_MFG_CMD_CONFIG_MAC_HE_TB_TX:
+		ret = wlan_ret_mfg_he_tb_tx(pmpriv, resp, pioctl_buf);
+		goto done;
+	case NXPWIFI_MFG_CMD_CONFIG_TRIGGER_FRAME:
+		ret = wlan_ret_mfg_config_trigger_frame(pmpriv, resp,
+							pioctl_buf);
+		goto done;
+	case NXPWIFI_MFG_CMD_OTP_MAC_ADD:
+		ret = wlan_ret_mfg_otp_rw(pmpriv, resp, pioctl_buf);
+		goto done;
+	case NXPWIFI_MFG_CMD_OTP_CAL_DATA:
+		ret = wlan_ret_mfg_otp_cal_data_rw(pmpriv, resp, pioctl_buf);
+		goto done;
+#endif
+	case NXPWIFI_MFG_CMD_SET_TEST_MODE:
+	case NXPWIFI_MFG_CMD_UNSET_TEST_MODE:
+	case NXPWIFI_MFG_CMD_TX_ANT:
+	case NXPWIFI_MFG_CMD_RX_ANT:
+	case NXPWIFI_MFG_CMD_RF_CHAN:
+	case NXPWIFI_MFG_CMD_CLR_RX_ERR:
+	case NXPWIFI_MFG_CMD_RF_BAND_AG:
+	case NXPWIFI_MFG_CMD_RF_CHANNELBW:
+	case NXPWIFI_MFG_CMD_RADIO_MODE_CFG:
+	case NXPWIFI_MFG_CMD_RFPWR:
+		break;
+	default:
+		ret = -EINVAL;
+		goto done;
+	}
+
+	cfg = (struct nxpwifi_mfg_cmd_generic_cfg *)data_buf;
+
+	cfg->error = le32_to_cpu(mcmd->error);
+	cfg->data1 = le32_to_cpu(mcmd->data1);
+
+	cfg->data2 = le32_to_cpu(mcmd->data2);
+	cfg->data3 = le32_to_cpu(mcmd->data3);
+done:
+	if (mcmd->error)
+		nxpwifi_dbg(priv->adapter, ERROR,
+			    "RFTM_COMMAND ERROR: 0x%08x\n",
+			    le32_to_cpu(mcmd->error));
+
+	return ret;
+}
+
 static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	{.cmd_no = HOST_CMD_GET_HW_SPEC,
 	.prepare_cmd = nxpwifi_cmd_sta_get_hw_spec,
@@ -3458,7 +3588,10 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
 	.cmd_resp = nxpwifi_ret_edmac_cfg},
 	{.cmd_no = HOST_CMD_CHAN_TRPC_CONFIG,
 	.prepare_cmd = nxpwifi_cmd_chan_trpc_cfg,
-	.cmd_resp = nxpwifi_ret_chan_trpc_cfg}
+	.cmd_resp = nxpwifi_ret_chan_trpc_cfg},
+	{.cmd_no = HOST_CMD_MFG_COMMAND,
+	.prepare_cmd = nxpwifi_mfg_cmd,
+	.cmd_resp = nxpwifi_ret_mfg_cmd}
 };
 
 /* This function prepares the commands before sending them to the firmware.
@@ -3467,8 +3600,8 @@ static const struct nxpwifi_cmd_entry cmd_table_sta[] = {
  * routines based upon the command number.
  */
 int nxpwifi_sta_prepare_cmd(struct nxpwifi_private *priv,
-			    struct cmd_ctrl_node *cmd_node,
-			    u16 cmd_action, u32 cmd_oid)
+			    struct cmd_ctrl_node *cmd_node, u16 cmd_action,
+			    u32 cmd_oid)
 
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
