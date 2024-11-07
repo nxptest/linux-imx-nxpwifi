@@ -220,6 +220,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 
 	adapter->hw_dot_11n_dev_cap = le32_to_cpu(hw_spec->dot_11n_dev_cap);
 	adapter->hw_dev_mcs_support = hw_spec->dev_mcs_support;
+	adapter->hw_mpdu_density = GET_MPDU_DENSITY(hw_spec->hw_dev_cap);
 	adapter->user_dev_mcs_support = adapter->hw_dev_mcs_support;
 	adapter->user_htstream = adapter->hw_dev_mcs_support;
 	if (adapter->fw_bands & BAND_A)

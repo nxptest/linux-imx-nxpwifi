@@ -713,7 +713,8 @@ nxpwifi_wmm_add_buf_txqueue(struct nxpwifi_private *priv,
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
 	u32 tid;
-	struct nxpwifi_ra_list_tbl *ra_list;
+	struct nxpwifi_ra_list_tbl *ra_list = NULL;
+	struct list_head list_head;
 	u8 ra[ETH_ALEN], tid_down;
 	struct ethhdr *eth_hdr = (struct ethhdr *)skb->data;
 
@@ -735,10 +736,19 @@ nxpwifi_wmm_add_buf_txqueue(struct nxpwifi_private *priv,
 	 * association we just don't have to call get_queue_raptr, we will
 	 * have only 1 raptr for a tid in case of infra
 	 */
-	memcpy(ra, skb->data, ETH_ALEN);
-	if (is_multicast_ether_addr(ra) || nxpwifi_is_skb_mgmt_frame(skb))
-		eth_broadcast_addr(ra);
-	ra_list = nxpwifi_wmm_get_queue_raptr(priv, tid_down, ra);
+	if (!nxpwifi_queuing_ra_based(priv) &&
+	    !nxpwifi_is_skb_mgmt_frame(skb)) {
+		list_head = priv->wmm.tid_tbl_ptr[tid_down].ra_list;
+		ra_list = list_first_entry_or_null(&list_head,
+						   struct nxpwifi_ra_list_tbl,
+						   list);
+	} else {
+		memcpy(ra, skb->data, ETH_ALEN);
+		if (is_multicast_ether_addr(ra) ||
+		    nxpwifi_is_skb_mgmt_frame(skb))
+			eth_broadcast_addr(ra);
+		ra_list = nxpwifi_wmm_get_queue_raptr(priv, tid_down, ra);
+	}
 
 	if (!ra_list) {
 		spin_unlock_bh(&priv->wmm.ra_list_spinlock);
@@ -752,7 +762,7 @@ nxpwifi_wmm_add_buf_txqueue(struct nxpwifi_private *priv,
 	ra_list->total_pkt_count++;
 
 	if (atomic_read(&priv->wmm.highest_queued_prio) <
-						priv->tos_to_tid_inv[tid_down])
+	    priv->tos_to_tid_inv[tid_down])
 		atomic_set(&priv->wmm.highest_queued_prio,
 			   priv->tos_to_tid_inv[tid_down]);
 

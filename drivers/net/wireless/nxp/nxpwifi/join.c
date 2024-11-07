@@ -450,11 +450,11 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 		nxpwifi_dbg(adapter, INFO, "info: Assoc: TLV Chan = %d\n",
 			    chan_tlv->chan_scan_param[0].chan_number);
 
-		chan_tlv->chan_scan_param[0].radio_type =
+		chan_tlv->chan_scan_param[0].band_cfg =
 			nxpwifi_band_to_radio_type((u8)bss_desc->bss_band);
 
 		nxpwifi_dbg(adapter, INFO, "info: Assoc: TLV Band = %d\n",
-			    chan_tlv->chan_scan_param[0].radio_type);
+			    chan_tlv->chan_scan_param[0].band_cfg);
 		pos += sizeof(chan_tlv->header) +
 			sizeof(struct nxpwifi_chan_scan_param_set);
 	}
@@ -475,7 +475,8 @@ int nxpwifi_cmd_802_11_associate(struct nxpwifi_private *priv,
 
 	if (ISSUPP_11ACENABLED(adapter->fw_cap_info) &&
 	    !bss_desc->disable_11n && !bss_desc->disable_11ac &&
-	    priv->config_bands & BAND_AAC)
+	    (priv->config_bands & BAND_GAC |
+	     priv->config_bands & BAND_AAC))
 		nxpwifi_cmd_append_11ac_tlv(priv, bss_desc, &pos);
 
 	if (ISSUPP_11AXENABLED(adapter->fw_cap_ext) &&

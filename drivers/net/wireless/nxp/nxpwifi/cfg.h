@@ -283,13 +283,6 @@ enum nxpwifi_chan_width {
 	CHAN_BW_5MHZ,
 };
 
-enum nxpwifi_chan_offset {
-	SEC_CHAN_NONE = 0,
-	SEC_CHAN_ABOVE = 1,
-	SEC_CHAN_5MHZ = 2,
-	SEC_CHAN_BELOW = 3
-};
-
 enum {
 	NXPWIFI_SCAN_TYPE_UNCHANGED = 0,
 	NXPWIFI_SCAN_TYPE_ACTIVE,

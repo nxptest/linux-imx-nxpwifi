@@ -903,6 +903,7 @@ struct nxpwifi_adapter {
 	u8 event_body[MAX_EVENT_SIZE];
 	u32 hw_dot_11n_dev_cap;
 	u8 hw_dev_mcs_support;
+	u8 hw_mpdu_density;
 	u8 user_dev_mcs_support;
 	u8 sec_chan_offset;
 	struct nxpwifi_dbg dbg;

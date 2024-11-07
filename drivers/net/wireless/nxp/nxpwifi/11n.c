@@ -28,7 +28,7 @@ int nxpwifi_fill_cap_info(struct nxpwifi_private *priv, u8 radio_type,
 	u16 bcn_ht_cap = le16_to_cpu(ht_cap->cap_info);
 	u16 ht_ext_cap = le16_to_cpu(ht_cap->extended_ht_cap_info);
 	struct ieee80211_supported_band *sband =
-					priv->wdev.wiphy->bands[radio_type];
+		priv->wdev.wiphy->bands[radio_type];
 
 	if (WARN_ON_ONCE(!sband)) {
 		nxpwifi_dbg(priv->adapter, ERROR, "Invalid radio type!\n");
@@ -36,9 +36,8 @@ int nxpwifi_fill_cap_info(struct nxpwifi_private *priv, u8 radio_type,
 	}
 
 	ht_cap->ampdu_params_info =
-		(sband->ht_cap.ampdu_factor &
-		 IEEE80211_HT_AMPDU_PARM_FACTOR) |
-		((sband->ht_cap.ampdu_density <<
+		(AMPDU_FACTOR_64K & IEEE80211_HT_AMPDU_PARM_FACTOR) |
+		((priv->adapter->hw_mpdu_density <<
 		 IEEE80211_HT_AMPDU_PARM_DENSITY_SHIFT) &
 		 IEEE80211_HT_AMPDU_PARM_DENSITY);
 
@@ -304,6 +303,7 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 {
 	struct nxpwifi_ie_types_htcap *ht_cap;
 	struct nxpwifi_ie_types_chan_list_param_set *chan_list;
+	struct nxpwifi_chan_scan_param_set *chan_param;
 	struct nxpwifi_ie_types_2040bssco *bss_co_2040;
 	struct nxpwifi_ie_types_extcap *ext_cap;
 	int ret_len = 0;
@@ -368,22 +368,37 @@ nxpwifi_cmd_append_11n_tlv(struct nxpwifi_private *priv,
 	if (bss_desc->bcn_ht_oper) {
 		chan_list =
 			(struct nxpwifi_ie_types_chan_list_param_set *)*buffer;
+		chan_param = chan_list->chan_scan_param;
 		memset(chan_list, 0, struct_size(chan_list, chan_scan_param, 1));
 		chan_list->header.type = cpu_to_le16(TLV_TYPE_CHANLIST);
-		chan_list->header.len =
-			cpu_to_le16(sizeof(struct nxpwifi_chan_scan_param_set));
-		chan_list->chan_scan_param[0].chan_number =
-			bss_desc->bcn_ht_oper->primary_chan;
-		chan_list->chan_scan_param[0].radio_type =
+		chan_list->header.len = cpu_to_le16(sizeof(*chan_param));
+		chan_param->chan_number = bss_desc->bcn_ht_oper->primary_chan;
+		chan_param->band_cfg =
 			nxpwifi_band_to_radio_type((u8)bss_desc->bss_band);
 
-		if (sband->ht_cap.cap & IEEE80211_HT_CAP_SUP_WIDTH_20_40 &&
-		    bss_desc->bcn_ht_oper->ht_param &
-		    IEEE80211_HT_PARAM_CHAN_WIDTH_ANY)
-			SET_SECONDARYCHAN
-			(chan_list->chan_scan_param[0].radio_type,
-			 (bss_desc->bcn_ht_oper->ht_param &
-			 IEEE80211_HT_PARAM_CHA_SEC_OFFSET));
+		if (ISSUPP_11ACENABLED(priv->adapter->fw_cap_info) &&
+		    bss_desc->bcn_vht_oper &&
+		    bss_desc->bcn_vht_oper->chan_width ==
+		    IEEE80211_VHT_CHANWIDTH_80MHZ) {
+			SET_SECONDARYCHAN(chan_param->band_cfg,
+					  (bss_desc->bcn_ht_oper->ht_param &
+					   IEEE80211_HT_PARAM_CHA_SEC_OFFSET));
+			chan_param->band_cfg |=
+				((CHAN_BW_80MHZ <<
+				  BAND_CFG_CHAN_WIDTH_SHIFT_BIT) &
+				 BAND_CFG_CHAN_WIDTH_MASK);
+		} else if (sband->ht_cap.cap &
+			   IEEE80211_HT_CAP_SUP_WIDTH_20_40 &&
+			   bss_desc->bcn_ht_oper->ht_param &
+			   IEEE80211_HT_PARAM_CHAN_WIDTH_ANY) {
+			SET_SECONDARYCHAN(chan_param->band_cfg,
+					  (bss_desc->bcn_ht_oper->ht_param &
+					   IEEE80211_HT_PARAM_CHA_SEC_OFFSET));
+			chan_param->band_cfg |=
+				((CHAN_BW_40MHZ <<
+				  BAND_CFG_CHAN_WIDTH_SHIFT_BIT) &
+				 BAND_CFG_CHAN_WIDTH_MASK);
+		}
 
 		*buffer += struct_size(chan_list, chan_scan_param, 1);
 		ret_len += struct_size(chan_list, chan_scan_param, 1);
@@ -762,6 +777,7 @@ u8 nxpwifi_get_sec_chan_offset(int chan)
 	case 140:
 	case 149:
 	case 157:
+	case 173:
 		sec_offset = IEEE80211_HT_PARAM_CHA_SEC_ABOVE;
 		break;
 	case 40:
@@ -776,6 +792,8 @@ u8 nxpwifi_get_sec_chan_offset(int chan)
 	case 144:
 	case 153:
 	case 161:
+	case 169:
+	case 177:
 		sec_offset = IEEE80211_HT_PARAM_CHA_SEC_BELOW;
 		break;
 	case 165:

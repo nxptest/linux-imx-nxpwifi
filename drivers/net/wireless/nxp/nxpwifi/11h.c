@@ -130,95 +130,6 @@ void nxpwifi_dfs_cac_work(struct work_struct *work)
 	}
 }
 
-static u8 nxpwifi_get_channel_2_offset(int chan)
-{
-	u8 chan2_offset = SEC_CHAN_NONE;
-
-	switch (chan) {
-	case 36:
-	case 44:
-	case 52:
-	case 60:
-	case 100:
-	case 108:
-	case 116:
-	case 124:
-	case 132:
-	case 140:
-	case 149:
-	case 157:
-	case 165:
-	case 173:
-		chan2_offset = SEC_CHAN_ABOVE;
-		break;
-	case 40:
-	case 48:
-	case 56:
-	case 64:
-	case 104:
-	case 112:
-	case 120:
-	case 128:
-	case 136:
-	case 144:
-	case 153:
-	case 161:
-	case 169:
-	case 177:
-		chan2_offset = SEC_CHAN_BELOW;
-		break;
-	}
-
-	return chan2_offset;
-}
-
-static void nxpwifi_convert_chan_to_band_cfg(u8 *band_cfg,
-					     struct cfg80211_chan_def *chan_def)
-{
-	u8 chan_band = 0, chan_width = 0, chan2_offset = 0;
-
-	switch (chan_def->chan->band) {
-	case NL80211_BAND_2GHZ:
-		chan_band = BAND_2GHZ;
-		break;
-	case NL80211_BAND_5GHZ:
-		chan_band = BAND_5GHZ;
-		break;
-	default:
-		break;
-	}
-
-	switch (chan_def->width) {
-	case NL80211_CHAN_WIDTH_20_NOHT:
-	case NL80211_CHAN_WIDTH_20:
-		chan_width = CHAN_BW_20MHZ;
-		break;
-	case NL80211_CHAN_WIDTH_40:
-		chan_width = CHAN_BW_40MHZ;
-		if (chan_def->center_freq1 > chan_def->chan->center_freq)
-			chan2_offset = SEC_CHAN_ABOVE;
-		else
-			chan2_offset = SEC_CHAN_BELOW;
-		break;
-	case NL80211_CHAN_WIDTH_80:
-		chan2_offset =
-			nxpwifi_get_channel_2_offset(chan_def->chan->hw_value);
-		chan_width = CHAN_BW_80MHZ;
-		break;
-	case NL80211_CHAN_WIDTH_80P80:
-	case NL80211_CHAN_WIDTH_160:
-	default:
-		break;
-	}
-
-	*band_cfg = ((chan2_offset << BAND_CFG_CHAN2_SHIFT_BIT) &
-		     BAND_CFG_CHAN2_OFFSET_MASK) |
-		    ((chan_width << BAND_CFG_CHAN_WIDTH_SHIFT_BIT) &
-		     BAND_CFG_CHAN_WIDTH_MASK) |
-		    ((chan_band << BAND_CFG_CHAN_BAND_SHIFT_BIT) &
-		     BAND_CFG_CHAN_BAND_MASK);
-}
-
 /* This function prepares channel report request command to FW for
  * starting radar detection.
  */
@@ -234,7 +145,8 @@ int nxpwifi_cmd_issue_chan_report_request(struct nxpwifi_private *priv,
 	size = S_DS_GEN;
 
 	cr_req->chan_desc.start_freq = cpu_to_le16(NXPWIFI_A_BAND_START_FREQ);
-	nxpwifi_convert_chan_to_band_cfg(&cr_req->chan_desc.band_cfg,
+	nxpwifi_convert_chan_to_band_cfg(priv,
+					 &cr_req->chan_desc.band_cfg,
 					 radar_params->chandef);
 	cr_req->chan_desc.chan_num = radar_params->chandef->chan->hw_value;
 	cr_req->msec_dwell_time = cpu_to_le32(radar_params->cac_time_ms);

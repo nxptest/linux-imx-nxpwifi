@@ -44,10 +44,10 @@ struct nxpwifi_fw_data {
 } __packed;
 
 struct nxpwifi_fw_dump_header {
-	__le16          seq_num;
-	__le16          reserved;
-	__le16          type;
-	__le16          len;
+	__le16 seq_num;
+	__le16 reserved;
+	__le16 type;
+	__le16 len;
 } __packed;
 
 #define FW_DUMP_INFO_ENDED 0x0002
@@ -282,6 +282,11 @@ enum NXPWIFI_802_11_PRIVACY_FILTER {
 #define ISSUPP_BEAMFORMING(dot_11n_dev_cap) ((dot_11n_dev_cap) & BIT(30))
 #define ISALLOWED_CHANWIDTH40(ht_param) ((ht_param) & BIT(2))
 #define GETSUPP_TXBASTREAMS(dot_11n_dev_cap) (((dot_11n_dev_cap) >> 18) & 0xF)
+
+/* AMPDU factor size */
+#define AMPDU_FACTOR_64K 0x03
+/* hw_dev_cap : MPDU DENSITY */
+#define GET_MPDU_DENSITY(hw_dev_cap) ((hw_dev_cap) & 0x7)
 
 /* httxcfg bitmap
  * 0		reserved
@@ -765,7 +770,7 @@ enum nxpwifi_chan_scan_mode_bitmasks {
 };
 
 struct nxpwifi_chan_scan_param_set {
-	u8 radio_type;
+	u8 band_cfg;
 	u8 chan_number;
 	u8 chan_scan_mode_bmap;
 	__le16 min_scan_time;
@@ -922,7 +927,7 @@ struct nxpwifi_ie_types_rsn_param_set {
 
 #define KEYPARAMSET_FIXED_LEN 6
 
-#define IGTK_PN_LEN		8
+#define IGTK_PN_LEN           8
 
 struct nxpwifi_cmac_param {
 	u8 ipn[IGTK_PN_LEN];
