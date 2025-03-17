@@ -53,6 +53,8 @@ union nxpwifi_scan_cmd_config_tlv {
 enum cipher_suite {
 	CIPHER_SUITE_TKIP,
 	CIPHER_SUITE_CCMP,
+	CIPHER_SUITE_GCMP_256,
+	CIPHER_SUITE_CCMP_256,
 	CIPHER_SUITE_MAX
 };
 
@@ -64,6 +66,8 @@ static u8 nxpwifi_wpa_oui[CIPHER_SUITE_MAX][4] = {
 static u8 nxpwifi_rsn_oui[CIPHER_SUITE_MAX][4] = {
 	{ 0x00, 0x0f, 0xac, 0x02 },	/* TKIP */
 	{ 0x00, 0x0f, 0xac, 0x04 },	/* AES  */
+	{ 0x00, 0x0f, 0xac, 0x09 },     /* GCMP_256 */
+	{ 0x00, 0x0f, 0xac, 0x0a },     /* CCMP_256 */
 };
 
 static void
@@ -351,6 +355,11 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 						    "info: Disable 11n if AES\t"
 						    "is not supported by AP\n");
 					bss_desc->disable_11n = true;
+				} else if (nxpwifi_is_rsn_oui_present
+						(bss_desc, CIPHER_SUITE_GCMP_256) ||
+						nxpwifi_is_rsn_oui_present
+						(bss_desc, CIPHER_SUITE_CCMP_256)) {
+					return 0;
 				} else {
 					return -EINVAL;
 				}

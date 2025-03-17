@@ -93,7 +93,11 @@ enum KEY_TYPE_ID {
 	KEY_TYPE_ID_AES,
 	KEY_TYPE_ID_WAPI,
 	KEY_TYPE_ID_AES_CMAC,
-	KEY_TYPE_ID_AES_CMAC_DEF,
+	KEY_TYPE_ID_GCMP,
+	KEY_TYPE_ID_GCMP_256,
+	KEY_TYPE_ID_CCMP_256,
+	KEY_TYPE_ID_BIP_GMAC_128,
+	KEY_TYPE_ID_BIP_GMAC_256,
 };
 
 #define WPA_PN_SIZE		8
@@ -957,6 +961,12 @@ struct nxpwifi_cmac_aes_param {
 	u8 key[WLAN_KEY_LEN_AES_CMAC];
 } __packed;
 
+struct nxpwifi_gmac_aes_param {
+	u8 ipn[IGTK_PN_LEN];
+	__le16 key_len;
+	u8 key[WLAN_KEY_LEN_BIP_GMAC_256];
+} __packed;
+
 struct nxpwifi_ie_type_key_param_set {
 	__le16 type;
 	__le16 len;
@@ -969,6 +979,7 @@ struct nxpwifi_ie_type_key_param_set {
 		struct nxpwifi_tkip_param tkip;
 		struct nxpwifi_aes_param aes;
 		struct nxpwifi_cmac_aes_param cmac_aes;
+		struct nxpwifi_gmac_aes_param gmac_aes;
 	} key_params;
 } __packed;
 
