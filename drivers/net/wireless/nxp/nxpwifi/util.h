@@ -120,4 +120,8 @@ void nxpwifi_queue_delayed_work(struct nxpwifi_adapter *adapter,
 bool nxpwifi_is_channel_setting_allowable(struct nxpwifi_private *priv,
 					  struct ieee80211_channel *check_chan);
 
+void nxpwifi_convert_chan_to_band_cfg(struct nxpwifi_private *priv,
+				      u8 *band_cfg,
+				      struct cfg80211_chan_def *chan_def);
+
 #endif /* !_NXPWIFI_UTIL_H_ */

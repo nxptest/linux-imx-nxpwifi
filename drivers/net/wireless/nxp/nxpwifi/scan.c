@@ -53,6 +53,8 @@ union nxpwifi_scan_cmd_config_tlv {
 enum cipher_suite {
 	CIPHER_SUITE_TKIP,
 	CIPHER_SUITE_CCMP,
+	CIPHER_SUITE_GCMP_256,
+	CIPHER_SUITE_CCMP_256,
 	CIPHER_SUITE_MAX
 };
 
@@ -64,6 +66,8 @@ static u8 nxpwifi_wpa_oui[CIPHER_SUITE_MAX][4] = {
 static u8 nxpwifi_rsn_oui[CIPHER_SUITE_MAX][4] = {
 	{ 0x00, 0x0f, 0xac, 0x02 },	/* TKIP */
 	{ 0x00, 0x0f, 0xac, 0x04 },	/* AES  */
+	{ 0x00, 0x0f, 0xac, 0x09 },     /* GCMP_256 */
+	{ 0x00, 0x0f, 0xac, 0x0a },     /* CCMP_256 */
 };
 
 static void
@@ -351,6 +355,11 @@ nxpwifi_is_network_compatible(struct nxpwifi_private *priv,
 						    "info: Disable 11n if AES\t"
 						    "is not supported by AP\n");
 					bss_desc->disable_11n = true;
+				} else if (nxpwifi_is_rsn_oui_present
+						(bss_desc, CIPHER_SUITE_GCMP_256) ||
+						nxpwifi_is_rsn_oui_present
+						(bss_desc, CIPHER_SUITE_CCMP_256)) {
+					return 0;
 				} else {
 					return -EINVAL;
 				}
@@ -404,7 +413,7 @@ nxpwifi_scan_create_channel_list(struct nxpwifi_private *priv,
 			ch = &sband->channels[i];
 			if (ch->flags & IEEE80211_CHAN_DISABLED)
 				continue;
-			scan_chan_list[chan_idx].radio_type = band;
+			scan_chan_list[chan_idx].band_cfg = band;
 
 			if (scan_time)
 				scan_chan_list[chan_idx].max_scan_time =
@@ -470,7 +479,7 @@ nxpwifi_bgscan_create_channel_list(struct nxpwifi_private *priv,
 			ch = &sband->channels[i];
 			if (ch->flags & IEEE80211_CHAN_DISABLED)
 				continue;
-			scan_chan_list[chan_idx].radio_type = band;
+			scan_chan_list[chan_idx].band_cfg = band;
 
 			if (scan_time)
 				scan_chan_list[chan_idx].max_scan_time =
@@ -594,12 +603,12 @@ nxpwifi_scan_channel_list(struct nxpwifi_private *priv,
 				continue;
 			}
 
-			radio_type = tmp_chan_list->radio_type;
+			radio_type = tmp_chan_list->band_cfg;
 			nxpwifi_dbg(priv->adapter, INFO,
-				    "info: Scan: Chan(%3d), Radio(%d),\t"
+				    "info: Scan: Chan(%3d), Band(%d),\t"
 				    "Mode(%d, %d), Dur(%d)\n",
 				    tmp_chan_list->chan_number,
-				    tmp_chan_list->radio_type,
+				    tmp_chan_list->band_cfg,
 				    tmp_chan_list->chan_scan_mode_bmap
 				    & NXPWIFI_PASSIVE_SCAN,
 				    (tmp_chan_list->chan_scan_mode_bmap
@@ -996,7 +1005,7 @@ nxpwifi_config_scan(struct nxpwifi_private *priv,
 
 			radio_type =
 				user_scan_in->chan_list[chan_idx].radio_type;
-			scan_chan_list[chan_idx].radio_type = radio_type;
+			scan_chan_list[chan_idx].band_cfg = radio_type;
 
 			scan_type = user_scan_in->chan_list[chan_idx].scan_type;
 
@@ -2315,7 +2324,7 @@ int nxpwifi_cmd_802_11_bg_scan_config(struct nxpwifi_private *priv,
 
 			temp_chan->chan_number =
 				bgscan_cfg_in->chan_list[chan_idx].chan_number;
-			temp_chan->radio_type =
+			temp_chan->band_cfg =
 				bgscan_cfg_in->chan_list[chan_idx].radio_type;
 
 			scan_type =

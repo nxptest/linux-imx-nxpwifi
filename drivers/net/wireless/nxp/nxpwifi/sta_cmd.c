@@ -220,6 +220,7 @@ nxpwifi_ret_sta_get_hw_spec(struct nxpwifi_private *priv,
 
 	adapter->hw_dot_11n_dev_cap = le32_to_cpu(hw_spec->dot_11n_dev_cap);
 	adapter->hw_dev_mcs_support = hw_spec->dev_mcs_support;
+	adapter->hw_mpdu_density = GET_MPDU_DENSITY(hw_spec->hw_dev_cap);
 	adapter->user_dev_mcs_support = adapter->hw_dev_mcs_support;
 	adapter->user_htstream = adapter->hw_dev_mcs_support;
 	if (adapter->fw_bands & BAND_A)
@@ -928,25 +929,48 @@ static int nxpwifi_set_aes_key(struct nxpwifi_private *priv,
 {
 	struct nxpwifi_adapter *adapter = priv->adapter;
 	u16 size, len = KEY_PARAMS_FIXED_LEN;
+	u8 key_type, key_type_igtk;
+
+
+	if (enc_key->key_len == WLAN_KEY_LEN_CCMP) {
+		key_type = KEY_TYPE_ID_AES;
+		key_type_igtk = KEY_TYPE_ID_AES_CMAC;
+	} else {
+		key_type = KEY_TYPE_ID_GCMP_256;
+		key_type_igtk = KEY_TYPE_ID_BIP_GMAC_256;
+	}
 
 	if (enc_key->is_igtk_key) {
-		nxpwifi_dbg(adapter, INFO,
-			    "%s: Set CMAC AES Key\n", __func__);
-		if (enc_key->is_rx_seq_valid)
-			memcpy(km->key_param_set.key_params.cmac_aes.ipn,
-			       enc_key->pn, enc_key->pn_len);
 		km->key_param_set.key_info &= cpu_to_le16(~KEY_MCAST);
 		km->key_param_set.key_info |= cpu_to_le16(KEY_IGTK);
-		km->key_param_set.key_type = KEY_TYPE_ID_AES_CMAC;
-		km->key_param_set.key_params.cmac_aes.key_len =
-					  cpu_to_le16(enc_key->key_len);
-		memcpy(km->key_param_set.key_params.cmac_aes.key,
-		       enc_key->key_material, enc_key->key_len);
-		len += sizeof(struct nxpwifi_cmac_aes_param);
+		km->key_param_set.key_type = key_type_igtk;
+		if (enc_key->key_len == WLAN_KEY_LEN_CCMP) {
+			nxpwifi_dbg(adapter, INFO,
+				"%s: Set CMAC AES Key\n", __func__);
+			if (enc_key->is_rx_seq_valid)
+				memcpy(km->key_param_set.key_params.cmac_aes.ipn,
+					enc_key->pn, enc_key->pn_len);
+			km->key_param_set.key_params.cmac_aes.key_len =
+				cpu_to_le16(enc_key->key_len);
+			memcpy(km->key_param_set.key_params.cmac_aes.key,
+					enc_key->key_material, enc_key->key_len);
+			len += sizeof(struct nxpwifi_cmac_aes_param);
+		} else {
+			nxpwifi_dbg(adapter, INFO,
+					"%s: Set GMAC AES Key\n", __func__);
+			if (enc_key->is_rx_seq_valid)
+				memcpy(km->key_param_set.key_params.gmac_aes.ipn,
+						enc_key->pn, enc_key->pn_len);
+			km->key_param_set.key_params.gmac_aes.key_len =
+				cpu_to_le16(enc_key->key_len);
+			memcpy(km->key_param_set.key_params.gmac_aes.key,
+				enc_key->key_material, enc_key->key_len);
+			len += sizeof(struct nxpwifi_gmac_aes_param);
+		}
 	} else if (enc_key->is_igtk_def_key) {
 		nxpwifi_dbg(adapter, INFO,
 			    "%s: Set CMAC default Key index\n", __func__);
-		km->key_param_set.key_type = KEY_TYPE_ID_AES_CMAC_DEF;
+		km->key_param_set.key_type = key_type_igtk;
 		km->key_param_set.key_idx = enc_key->key_index & KEY_INDEX_MASK;
 	} else {
 		nxpwifi_dbg(adapter, INFO,
@@ -954,7 +978,7 @@ static int nxpwifi_set_aes_key(struct nxpwifi_private *priv,
 		if (enc_key->is_rx_seq_valid)
 			memcpy(km->key_param_set.key_params.aes.pn,
 			       enc_key->pn, enc_key->pn_len);
-		km->key_param_set.key_type = KEY_TYPE_ID_AES;
+		km->key_param_set.key_type = key_type;
 		km->key_param_set.key_params.aes.key_len =
 					  cpu_to_le16(enc_key->key_len);
 		memcpy(km->key_param_set.key_params.aes.key,
@@ -1079,7 +1103,8 @@ nxpwifi_cmd_sta_802_11_key_material(struct nxpwifi_private *priv,
 
 	km->key_param_set.key_info = cpu_to_le16(key_info);
 
-	if (enc_key->key_len == WLAN_KEY_LEN_CCMP)
+	if (enc_key->key_cipher != WLAN_CIPHER_SUITE_TKIP &&
+			enc_key->key_len >= WLAN_KEY_LEN_CCMP)
 		return nxpwifi_set_aes_key(priv, cmd, enc_key, km);
 
 	if (enc_key->key_len == WLAN_KEY_LEN_TKIP) {
@@ -1128,7 +1153,8 @@ nxpwifi_ret_sta_802_11_key_material(struct nxpwifi_private *priv,
 		}
 	}
 
-	if (key->key_param_set.key_type != KEY_TYPE_ID_AES)
+	if (key->key_param_set.key_type != KEY_TYPE_ID_AES &&
+		key->key_param_set.key_type != KEY_TYPE_ID_GCMP_256)
 		return 0;
 
 	memset(priv->aes_key.key_param_set.key_params.aes.key, 0,

@@ -87,7 +87,7 @@ u8 nxpwifi_get_chan_type(struct nxpwifi_private *priv)
 				return NL80211_CHAN_NO_HT;
 		case CHAN_BW_40MHZ:
 			if (channel_band.band_config.chan2_offset ==
-			    SEC_CHAN_ABOVE)
+			    IEEE80211_HT_PARAM_CHA_SEC_ABOVE)
 				return NL80211_CHAN_HT40PLUS;
 			else
 				return NL80211_CHAN_HT40MINUS;
@@ -1421,6 +1421,10 @@ static const u32 nxpwifi_cipher_suites[] = {
 	WLAN_CIPHER_SUITE_CCMP,
 	WLAN_CIPHER_SUITE_SMS4,
 	WLAN_CIPHER_SUITE_AES_CMAC,
+	WLAN_CIPHER_SUITE_GCMP_256,
+	WLAN_CIPHER_SUITE_CCMP_256,
+	WLAN_CIPHER_SUITE_BIP_GMAC_256,
+	WLAN_CIPHER_SUITE_BIP_CMAC_256,
 };
 
 /* Supported mgmt frame types to be advertised to cfg80211 */

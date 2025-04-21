@@ -283,13 +283,6 @@ enum nxpwifi_chan_width {
 	CHAN_BW_5MHZ,
 };
 
-enum nxpwifi_chan_offset {
-	SEC_CHAN_NONE = 0,
-	SEC_CHAN_ABOVE = 1,
-	SEC_CHAN_5MHZ = 2,
-	SEC_CHAN_BELOW = 3
-};
-
 enum {
 	NXPWIFI_SCAN_TYPE_UNCHANGED = 0,
 	NXPWIFI_SCAN_TYPE_ACTIVE,
@@ -527,6 +520,7 @@ struct nxpwifi_ds_encrypt_key {
 	u32 key_disable;
 	u32 key_index;
 	u32 key_len;
+	u32 key_cipher;
 	u8 key_material[WLAN_MAX_KEY_LEN];
 	u8 mac_addr[ETH_ALEN];
 	u8 pn[PN_LEN];		/* packet number */

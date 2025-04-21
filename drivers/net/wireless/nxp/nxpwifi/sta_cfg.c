@@ -954,8 +954,12 @@ int nxpwifi_set_encode(struct nxpwifi_private *priv, struct key_params *kp,
 	encrypt_key.key_len = key_len;
 	encrypt_key.key_index = key_index;
 
-	if (kp && kp->cipher == WLAN_CIPHER_SUITE_AES_CMAC)
-		encrypt_key.is_igtk_key = true;
+	if (kp) {
+		encrypt_key.key_cipher = kp->cipher;
+		if (kp->cipher == WLAN_CIPHER_SUITE_AES_CMAC ||
+			kp->cipher == WLAN_CIPHER_SUITE_BIP_GMAC_256)
+			encrypt_key.is_igtk_key = true;
+	}
 
 	if (!disable) {
 		if (key_len)
